@@ -13,6 +13,7 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1920.0, 540.0]),
+        // vsync: false,
         ..Default::default()
     };
     eframe::run_native(
@@ -27,7 +28,7 @@ struct MyApp {
     looping: bool,
     time_instant: Instant,
     bpm: f32,
-    transport: Instant,
+    start_instant: Instant,
 }
 
 impl MyApp {
@@ -37,7 +38,7 @@ impl MyApp {
             looping: false,
             time_instant: Instant::now(),
             bpm: 20.0,
-            transport: Instant::now(),
+            start_instant: Instant::now(),
         }
     }
 }
@@ -48,15 +49,18 @@ impl eframe::App for MyApp {
             let now = Instant::now();
             let since = now - self.time_instant;
             let one_sec = Duration::from_secs(1);
-            let transport = now - self.transport;
+            let transport = now - self.start_instant;
             let beat = (transport.as_micros() as f32 / 1000000.0) * self.bpm / 60.0;
 
             self.time_instant = now;
 
-            ui.label(format!(
-                "Freq: {:?}",
-                one_sec.as_micros() / since.as_micros()
-            ));
+            let f = (one_sec.as_micros() / since.as_micros()) as u32;
+
+            ui.label(format!("Freq: {:?}", f));
+
+            if f < 59 || f > 61 {
+                debug!("frame-rate {}", f);
+            }
 
             ui.label(format!("Transport: {:?}", transport));
             ui.label(format!("Beat {}, Pos {}", 1 + beat as u32 % 4, beat as u32));
@@ -68,7 +72,7 @@ impl eframe::App for MyApp {
             }
             if ui.button("restart").clicked() {
                 trace!("restart {:?}", ui.clip_rect());
-                self.transport = Instant::now();
+                self.start_instant = Instant::now();
             }
             self.fret_board.ui_content(ui, beat);
             ctx.request_repaint();
@@ -244,7 +248,7 @@ impl FretBoard {
             let c = (rect.left() + (n.on - play_head) * bar_pixels, y).into();
 
             if n.on > play_head + self.config.beats || n.on < play_head {
-                debug!("skipping {}", n.on);
+                trace!("skipping {}", n.on);
             }
             if let Some(ext) = n.ext {
                 let top = string_space * (n.fret as f32) + rect.top();

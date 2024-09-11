@@ -9,5 +9,6 @@ egui = { version = "0.28.1", features = ["serde"] }
 egui_extras = "0.28.1"
 egui_plot = "0.28.1"
 env_logger = "0.11.5"
-log = "0.4.22"
+log = { version = "0.4.22", features = ["release_max_level_off"] }
+# log = { version = "0.4.22", features = ["release_max_level_off"] }
 splines = { version = "4.3.1" }
