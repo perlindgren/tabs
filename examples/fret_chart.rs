@@ -82,7 +82,8 @@ impl eframe::App for MyApp {
 struct Note {
     fret: u8,
     pos: u8,
-    on: f32, // time in beats, 3.0 denotes a note at beat 3, 3.25 a note at beat 3 and a quarter
+    on: f32, // on time in beats, 3.0 denotes a note at beat 3, 3.25 a note at beat 3 and a quarter
+    ext: Option<f32>, // off time
 }
 
 struct FretBoard {
@@ -102,46 +103,61 @@ impl Default for FretBoard {
                     fret: 0,
                     pos: 3,
                     on: 0.0,
+                    ext: None,
                 },
                 Note {
                     fret: 1,
                     pos: 1,
                     on: 1.0,
+                    ext: None,
                 },
                 Note {
                     fret: 2,
                     pos: 0,
                     on: 2.0,
+                    ext: None,
                 },
                 Note {
                     fret: 3,
                     pos: 5,
                     on: 3.0,
+                    ext: None,
                 },
                 Note {
                     fret: 4,
                     pos: 2,
                     on: 4.0,
+                    ext: None,
                 },
                 Note {
                     fret: 5,
                     pos: 2,
                     on: 4.0,
+                    ext: Some(4.5),
                 },
                 Note {
                     fret: 1,
                     pos: 2,
                     on: 5.0,
+                    ext: None,
                 },
                 Note {
                     fret: 1,
                     pos: 3,
                     on: 5.25,
+                    ext: None,
                 },
                 Note {
                     fret: 2,
                     pos: 3,
                     on: 6.0,
+                    ext: None,
+                },
+                Note {
+                    fret: 2,
+                    pos: 10,
+                    on: 10.0,
+                    ext: Some(11.0),
                 },
             ],
         }
@@ -224,20 +240,44 @@ impl FretBoard {
         }
 
         // draw note
-        let note_stroke = Stroke::new(1.0, Color32::RED);
+        let note_stroke = Stroke::new(2.0, Color32::WHITE);
 
         for n in &self.notes {
             let y = string_space * (0.5 + n.fret as f32) + rect.top();
             let c = (rect.left() + (n.on - play_head) * bar_pixels, y).into();
 
-            painter.circle(c, string_space / 2.0, Color32::LIGHT_RED, note_stroke);
-            painter.text(
-                c,
-                Align2::CENTER_CENTER,
-                format!("{}", n.pos),
-                FontId::monospace(string_space * 0.4),
-                Color32::WHITE,
-            );
+            if n.on > play_head + self.config.beats || n.on < play_head {
+                debug!("skipping {}", n.on);
+            }
+            if let Some(ext) = n.ext {
+                let top = string_space * (n.fret as f32) + rect.top();
+                let bottom = string_space * (1.0 + n.fret as f32) + rect.top();
+                let left = rect.left() + (n.on - play_head) * bar_pixels - string_space * 0.5;
+                let right = rect.left() + (ext - play_head) * bar_pixels + string_space * 0.5;
+
+                painter.rect(
+                    [(left, top).into(), (right, bottom).into()].into(),
+                    (string_space * 0.1),
+                    Color32::LIGHT_RED,
+                    note_stroke,
+                );
+                painter.text(
+                    c,
+                    Align2::CENTER_CENTER,
+                    format!("{}", n.pos),
+                    FontId::monospace(string_space * 0.4),
+                    Color32::WHITE,
+                );
+            } else {
+                painter.circle(c, string_space / 2.0, Color32::LIGHT_RED, note_stroke);
+                painter.text(
+                    c,
+                    Align2::CENTER_CENTER,
+                    format!("{}", n.pos),
+                    FontId::monospace(string_space * 0.4),
+                    Color32::WHITE,
+                );
+            }
         }
 
         // painter.debug_rect(rect, Color32::RED, "here");
