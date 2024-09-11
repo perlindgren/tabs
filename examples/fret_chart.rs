@@ -2,7 +2,6 @@
 
 use eframe::egui;
 use egui::Stroke;
-use egui_plot::{Line, Plot, PlotPoints};
 use std::time::{Duration, Instant};
 
 use egui::*;
@@ -22,8 +21,6 @@ fn main() -> Result<(), eframe::Error> {
         Box::new(|cc| Ok(Box::new(MyApp::new(cc)))),
     )
 }
-
-use splines::{Interpolation, Key, Spline};
 
 struct MyApp {
     fret_board: FretBoard,
@@ -257,7 +254,7 @@ impl FretBoard {
 
                 painter.rect(
                     [(left, top).into(), (right, bottom).into()].into(),
-                    (string_space * 0.1),
+                    string_space * 0.1,
                     Color32::LIGHT_RED,
                     note_stroke,
                 );
@@ -293,15 +290,15 @@ impl FretBoard {
 
 #[cfg(test)]
 mod test {
-    use crate::FretBoard;
+    // use crate::FretBoard;
 
-    #[test]
-    fn test_beat_to_pos() {
-        let fb = FretBoard::default();
+    // #[test]
+    // fn test_beat_to_pos() {
+    //     let fb = FretBoard::default();
 
-        let r = fb.beat_to_pos(2.0, 1.0);
-        println!("r {}", r);
-    }
+    //     let r = fb.beat_to_pos(2.0, 1.0);
+    //     println!("r {}", r);
+    // }
 
     #[test]
     fn fmod() {
