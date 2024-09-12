@@ -1,4 +1,7 @@
 use core::marker::PhantomData;
+use num_enum::{IntoPrimitive, TryFromPrimitive};
+use std::convert::TryFrom;
+use std::ops::Add;
 
 trait StringInstrument<const N: usize, T>
 where
@@ -98,12 +101,14 @@ where
     T: Tuning<N>,
 {
     fn from(note: FretNote<N, T>) -> Self {
-        let e = &T::BASE_NOTES[note.string as usize];
-        *e
+        let b = T::BASE_NOTES[note.string as usize] + note.fret.into();
+        b
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, IntoPrimitive, TryFromPrimitive)]
+#[repr(u8)]
+
 enum SemiTone {
     C,
     CSharpDFlat,
@@ -123,6 +128,34 @@ enum SemiTone {
 struct Note {
     semi_tone: SemiTone,
     octave: u8,
+}
+
+impl From<u8> for Note {
+    fn from(v: u8) -> Self {
+        Self {
+            semi_tone: SemiTone::try_from(v % 12).unwrap(),
+            octave: v / 12,
+        }
+    }
+}
+
+impl From<Note> for u8 {
+    fn from(n: Note) -> Self {
+        let s: u8 = n.semi_tone.into();
+        s + 12 * n.octave
+    }
+}
+
+impl Add for Note {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let s1: u8 = self.into();
+        let s2: u8 = other.into();
+        let n: Note = (s1 + s2).into();
+
+        n
+    }
 }
 
 pub struct Notes<const N: usize, T>(pub Vec<FretNote<N, T>>)
