@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::convert::TryFrom;
-use std::ops::Add;
+use std::ops::{Add, Sub};
 
 trait StringInstrument<const N: usize, T>
 where
@@ -152,9 +152,17 @@ impl Add for Note {
     fn add(self, other: Self) -> Self {
         let s1: u8 = self.into();
         let s2: u8 = other.into();
-        let n: Note = (s1 + s2).into();
+        (s1 + s2).into()
+    }
+}
 
-        n
+impl Sub for Note {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        let s1: u8 = self.into();
+        let s2: u8 = other.into();
+        (s1 - s2).into()
     }
 }
 
@@ -170,15 +178,23 @@ mod test {
 
     fn test_from() {
         let n = FretNote::<6, EADGBE> {
-            string: 2,
-            fret: 10,
+            string: 0,
+            fret: 3,
             start: 10.0,
             ext: Some(11.0),
             _marker: PhantomData,
         };
 
+        let oct: Note = 12.into();
+        let one: Note = 8.into();
         let n: Note = n.into();
         println!("n {:?}", n);
+        let m: Note = n + oct;
+        println!("m {:?}", m);
+        let s: Note = m - one;
+        println!("s {:?}", s);
+        let max: Note = 255.into();
+        println!("max {:?}", max);
     }
 }
 
