@@ -103,10 +103,6 @@ where
     }
 }
 
-// pub struct Notes<T>(pub Vec<FretNote<T>>)
-// where
-//     T: StringInstrument;
-
 #[derive(Debug, Copy, Clone)]
 enum SemiTone {
     C,
@@ -129,6 +125,10 @@ struct Note {
     octave: u8,
 }
 
+pub struct Notes<const N: usize, T>(pub Vec<FretNote<N, T>>)
+where
+    T: Tuning<N>;
+
 #[cfg(test)]
 mod test {
     use crate::*;
@@ -149,79 +149,79 @@ mod test {
     }
 }
 
-// impl Default for Notes<Guitar6String<EADGBE>> {
-//     fn default() -> Self {
-//         Notes(vec![
-//             FretNote {
-//                 string: 0,
-//                 fret: 3,
-//                 start: 0.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 1,
-//                 fret: 1,
-//                 start: 1.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 2,
-//                 fret: 0,
-//                 start: 2.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 3,
-//                 fret: 5,
-//                 start: 3.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 4,
-//                 fret: 2,
-//                 start: 4.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 5,
-//                 fret: 2,
-//                 start: 4.0,
-//                 ext: Some(4.5),
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 1,
-//                 fret: 2,
-//                 start: 5.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 1,
-//                 fret: 3,
-//                 start: 5.25,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 2,
-//                 fret: 3,
-//                 start: 6.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 2,
-//                 fret: 10,
-//                 start: 10.0,
-//                 ext: Some(11.0),
-//                 _marker: PhantomData,
-//             },
-//         ])
-//     }
-// }
+impl Default for Notes<6, EADGBE> {
+    fn default() -> Self {
+        Notes(vec![
+            FretNote {
+                string: 0,
+                fret: 3,
+                start: 0.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 1,
+                fret: 1,
+                start: 1.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 2,
+                fret: 0,
+                start: 2.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 3,
+                fret: 5,
+                start: 3.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 4,
+                fret: 2,
+                start: 4.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 5,
+                fret: 2,
+                start: 4.0,
+                ext: Some(4.5),
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 1,
+                fret: 2,
+                start: 5.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 1,
+                fret: 3,
+                start: 5.25,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 2,
+                fret: 3,
+                start: 6.0,
+                ext: None,
+                _marker: PhantomData,
+            },
+            FretNote {
+                string: 2,
+                fret: 10,
+                start: 10.0,
+                ext: Some(11.0),
+                _marker: PhantomData,
+            },
+        ])
+    }
+}
