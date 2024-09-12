@@ -58,9 +58,9 @@ impl eframe::App for MyApp {
 
             ui.label(format!("Freq: {:?}", f));
 
-            // if f < 59 || f > 61 {
-            //     debug!("frame-rate {}", f);
-            // }
+            if f < 59 || f > 61 {
+                debug!("frame-rate {}", f);
+            }
 
             ui.label(format!("Transport: {:?}", transport));
             ui.label(format!("Beat {}, Pos {}", 1 + beat as u32 % 4, beat as u32));
@@ -167,16 +167,33 @@ impl Default for FretBoard {
 
 #[derive(Debug)]
 struct Config {
-    beats: f32,
-    subs: f32,
+    frets: Vec<f32>,
+    sum_frets: f32, // last fret position
+}
+impl Config {
+    fn new(nr_frets: usize) -> Self {
+        const FACTOR: f32 = 17.817154;
+
+        let mut sum_frets = 0.0;
+        let mut frets = vec![];
+
+        let mut scale_length = 1.0;
+
+        for _ in 0..nr_frets {
+            let next = scale_length / FACTOR;
+
+            frets.push(next + sum_frets);
+            scale_length -= next;
+            sum_frets += next;
+        }
+
+        Config { frets, sum_frets }
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            beats: 4.0,
-            subs: 4.0,
-        }
+        Config::new(22)
     }
 }
 
@@ -200,109 +217,79 @@ impl FretBoard {
             );
         }
 
-        // draw bars,
-        let bar_stroke = Stroke::new(1.0, Color32::from_gray(255));
-        let sub_stroke = Stroke::new(1.0, Color32::from_gray(64));
+        // draw frets,
+        let fret_stroke = Stroke::new(1.0, Color32::from_gray(255));
+        let scaling = rect.width() / self.config.sum_frets;
 
-        let subs = self.config.beats * self.config.subs;
-        let bar_pixels = rect.width() / self.config.beats;
-        let sub_pixels = bar_pixels / self.config.subs;
-
-        for i in 0..subs as usize {
-            let x = sub_pixels * i as f32 - play_head * bar_pixels;
-            let x = x % rect.width();
-            let x = if x < 0.0 { x + rect.width() } else { x };
-            let x = x + rect.left();
-            let x = x.round();
-
-            painter.line_segment(
-                [(x, rect.top()).into(), (x, rect.bottom()).into()],
-                if i % self.config.subs as usize == 0 {
-                    bar_stroke
-                } else {
-                    sub_stroke
-                },
+        self.config.frets.iter().enumerate().for_each(|(i, fret)| {
+            painter.vline(
+                rect.left() + fret * scaling,
+                Rangef::new(rect.top(), rect.bottom()),
+                fret_stroke,
             );
             painter.text(
-                (x, 20.0 + rect.top()).into(),
+                (
+                    rect.left() + fret * scaling - rect.width() * 0.01,
+                    rect.width() * 0.005 + rect.top(),
+                )
+                    .into(),
                 Align2::CENTER_CENTER,
-                if false {
-                    format!(
-                        "{}/{}",
-                        play_head.trunc() as usize + i,
-                        i % self.config.subs as usize
-                    )
-                } else {
-                    format!("{}", i % self.config.subs as usize)
-                },
-                FontId::monospace(string_space * 0.4),
+                format!("{}", i + 1),
+                FontId::monospace(rect.width() * 0.01),
                 Color32::WHITE,
             );
-        }
+        });
 
-        // draw note
-        let note_stroke = Stroke::new(2.0, Color32::WHITE);
+        // // draw note
+        // let note_stroke = Stroke::new(2.0, Color32::WHITE);
 
-        for n in &self.notes {
-            let y = string_space * (0.5 + n.fret as f32) + rect.top();
-            let c = (rect.left() + (n.on - play_head) * bar_pixels, y).into();
+        // for n in &self.notes {
+        //     let y = string_space * (0.5 + n.fret as f32) + rect.top();
+        //     let c = (rect.left() + (n.on - play_head) * bar_pixels, y).into();
 
-            if n.on > play_head + self.config.beats || n.on < play_head {
-                trace!("skipping {}", n.on);
-            }
-            if let Some(ext) = n.ext {
-                let top = string_space * (n.fret as f32) + rect.top();
-                let bottom = string_space * (1.0 + n.fret as f32) + rect.top();
-                let left = rect.left() + (n.on - play_head) * bar_pixels - string_space * 0.5;
-                let right = rect.left() + (ext - play_head) * bar_pixels + string_space * 0.5;
+        //     if n.on > play_head + self.config.beats || n.on < play_head {
+        //         trace!("skipping {}", n.on);
+        //     }
+        //     if let Some(ext) = n.ext {
+        //         let top = string_space * (n.fret as f32) + rect.top();
+        //         let bottom = string_space * (1.0 + n.fret as f32) + rect.top();
+        //         let left = rect.left() + (n.on - play_head) * bar_pixels - string_space * 0.5;
+        //         let right = rect.left() + (ext - play_head) * bar_pixels + string_space * 0.5;
 
-                painter.rect(
-                    [(left, top).into(), (right, bottom).into()].into(),
-                    string_space * 0.1,
-                    Color32::LIGHT_RED,
-                    note_stroke,
-                );
-                painter.text(
-                    c,
-                    Align2::CENTER_CENTER,
-                    format!("{}", n.pos),
-                    FontId::monospace(string_space * 0.4),
-                    Color32::WHITE,
-                );
-            } else {
-                painter.circle(c, string_space / 2.0, Color32::LIGHT_RED, note_stroke);
-                painter.text(
-                    c,
-                    Align2::CENTER_CENTER,
-                    format!("{}", n.pos),
-                    FontId::monospace(string_space * 0.4),
-                    Color32::WHITE,
-                );
-            }
-        }
+        //         painter.rect(
+        //             [(left, top).into(), (right, bottom).into()].into(),
+        //             string_space * 0.1,
+        //             Color32::LIGHT_RED,
+        //             note_stroke,
+        //         );
+        //         painter.text(
+        //             c,
+        //             Align2::CENTER_CENTER,
+        //             format!("{}", n.pos),
+        //             FontId::monospace(string_space * 0.4),
+        //             Color32::WHITE,
+        //         );
+        //     } else {
+        //         painter.circle(c, string_space / 2.0, Color32::LIGHT_RED, note_stroke);
+        //         painter.text(
+        //             c,
+        //             Align2::CENTER_CENTER,
+        //             format!("{}", n.pos),
+        //             FontId::monospace(string_space * 0.4),
+        //             Color32::WHITE,
+        //         );
+        //     }
+        // }
 
         // painter.debug_rect(rect, Color32::RED, "here");
         response
     }
-
-    // we assume play head to be displayed one bar in
-    // #[inline(always)]
-    // pub fn beat_to_pos(&self, play_head: f32, beat: f32) -> f32 {
-    //     self.config.beat_pixels * (beat - play_head)
-    // }
 }
 
 #[cfg(test)]
 mod test {
-    // use crate::FretBoard;
 
-    // #[test]
-    // fn test_beat_to_pos() {
-    //     let fb = FretBoard::default();
-
-    //     let r = fb.beat_to_pos(2.0, 1.0);
-    //     println!("r {}", r);
-    // }
+    use crate::Config;
 
     #[test]
     fn fmod() {
@@ -310,5 +297,11 @@ mod test {
         for i in 0..20 {
             println!("{}", range + (i as f32 * 1.05) % range);
         }
+    }
+
+    #[test]
+    fn test_config() {
+        let config = Config::default();
+        println!("config {:?}", config);
     }
 }
