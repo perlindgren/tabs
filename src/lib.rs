@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use libm;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::convert::TryFrom;
 use std::ops::{Add, Sub};
@@ -82,7 +83,7 @@ struct Base4String<T: Tuning<4>> {
     tuning: T,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct FretNote<const N: usize, T>
 where
     T: Tuning<N>,
@@ -101,8 +102,16 @@ where
     T: Tuning<N>,
 {
     fn from(note: FretNote<N, T>) -> Self {
-        let b = T::BASE_NOTES[note.string as usize] + note.fret.into();
-        b
+        T::BASE_NOTES[note.string as usize] + note.fret.into()
+    }
+}
+
+impl<const N: usize, T> From<&FretNote<N, T>> for Note
+where
+    T: Tuning<N>,
+{
+    fn from(note: &FretNote<N, T>) -> Self {
+        T::BASE_NOTES[note.string as usize] + note.fret.into()
     }
 }
 
@@ -166,6 +175,26 @@ impl Sub for Note {
     }
 }
 
+#[derive(Debug)]
+struct Hz(f32);
+
+impl From<Note> for Hz {
+    fn from(n: Note) -> Self {
+        let a0 = Note {
+            semi_tone: SemiTone::A,
+            octave: 0,
+        };
+
+        let diff: u8 = (n - a0).into();
+
+        println!("{}", diff);
+        let exp = diff as f64 / 12.0;
+        let freq_diff = libm::exp2(exp);
+
+        Hz(freq_diff as f32 * 27.5)
+    }
+}
+
 pub struct Notes<const N: usize, T>(pub Vec<FretNote<N, T>>)
 where
     T: Tuning<N>;
@@ -175,7 +204,23 @@ mod test {
     use crate::*;
 
     #[test]
+    fn test_hz() {
+        let fret_note: &FretNote<6, EADGBE> = &FretNote {
+            string: 0,
+            fret: 0,
+            start: 10.0,
+            ext: Some(11.0),
+            _marker: PhantomData,
+        };
 
+        let note: Note = fret_note.into();
+
+        let hz: Hz = note.into();
+
+        println!("note {:?}, freq {:?}", fret_note, hz)
+    }
+
+    #[test]
     fn test_from() {
         let n = FretNote::<6, EADGBE> {
             string: 0,
