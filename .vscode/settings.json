@@ -4,6 +4,7 @@
     "EADGBE",
     "eframe",
     "egui",
+    "libm",
     "repr",
     "vline",
     "vsync"

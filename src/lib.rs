@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-use libm;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::convert::TryFrom;
 use std::ops::{Add, Sub};
@@ -185,11 +184,10 @@ impl From<Note> for Hz {
             octave: 0,
         };
 
-        let diff: u8 = (n - a0).into();
+        let diff_semitones: u8 = (n - a0).into();
 
-        println!("{}", diff);
-        let exp = diff as f64 / 12.0;
-        let freq_diff = libm::exp2(exp);
+        let exp = diff_semitones as f64 / 12.0;
+        let freq_diff = exp.exp2();
 
         Hz(freq_diff as f32 * 27.5)
     }
@@ -205,15 +203,15 @@ mod test {
 
     #[test]
     fn test_hz() {
-        let fret_note: &FretNote<6, EADGBE> = &FretNote {
-            string: 0,
+        let fret_note: FretNote<6, EADGBE> = FretNote {
+            string: 1,
             fret: 0,
             start: 10.0,
             ext: Some(11.0),
             _marker: PhantomData,
         };
 
-        let note: Note = fret_note.into();
+        let note: Note = (&fret_note).into();
 
         let hz: Hz = note.into();
 
