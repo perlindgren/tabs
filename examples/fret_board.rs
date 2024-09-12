@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use egui::*;
 use log::*;
+use tabs::*;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -80,18 +81,10 @@ impl eframe::App for MyApp {
     }
 }
 
-#[derive(Debug)]
-struct Note {
-    string: u8,
-    pos: u8,
-    on: f32, // on time in beats, 3.0 denotes a note at beat 3, 3.25 a note at beat 3 and a quarter
-    ext: Option<f32>, // off time
-}
-
 struct FretBoard {
     config: Config,
     nr_frets: u8,
-    notes: Vec<Note>, // perhaps we should use some btree for sorted data structure
+    notes: Notes, // perhaps we should use some btree for sorted data structure
 }
 
 impl Default for FretBoard {
@@ -99,69 +92,7 @@ impl Default for FretBoard {
         Self {
             config: Config::default(),
             nr_frets: 6,
-
-            notes: vec![
-                Note {
-                    string: 0,
-                    pos: 3,
-                    on: 0.0,
-                    ext: None,
-                },
-                Note {
-                    string: 1,
-                    pos: 1,
-                    on: 1.0,
-                    ext: None,
-                },
-                Note {
-                    string: 2,
-                    pos: 0,
-                    on: 2.0,
-                    ext: None,
-                },
-                Note {
-                    string: 3,
-                    pos: 5,
-                    on: 3.0,
-                    ext: None,
-                },
-                Note {
-                    string: 4,
-                    pos: 2,
-                    on: 4.0,
-                    ext: None,
-                },
-                Note {
-                    string: 5,
-                    pos: 2,
-                    on: 4.0,
-                    ext: Some(4.5),
-                },
-                Note {
-                    string: 1,
-                    pos: 2,
-                    on: 5.0,
-                    ext: None,
-                },
-                Note {
-                    string: 1,
-                    pos: 3,
-                    on: 5.25,
-                    ext: None,
-                },
-                Note {
-                    string: 2,
-                    pos: 3,
-                    on: 6.0,
-                    ext: None,
-                },
-                Note {
-                    string: 2,
-                    pos: 10,
-                    on: 10.0,
-                    ext: Some(11.0),
-                },
-            ],
+            notes: Notes::default(),
         }
     }
 }
@@ -245,10 +176,10 @@ impl FretBoard {
         // draw note
         let note_stroke = Stroke::new(2.0, Color32::WHITE);
 
-        for n in &self.notes {
+        for n in &self.notes.0 {
             //
-            if n.pos > 0 {
-                if let Some(fret) = self.config.frets.get(n.pos as usize - 1) {
+            if n.fret > 0 {
+                if let Some(fret) = self.config.frets.get(n.fret as usize - 1) {
                     debug!("note n {:?}, fret {:?}", n, fret);
                     let y = string_space * (0.5 + n.string as f32) + rect.top();
 

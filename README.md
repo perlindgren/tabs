@@ -1,4 +1,6 @@
-# JamBox
+# Tabs
+
+Totally accurate band simulator to be.
 
 Early experiment to explore:
 
