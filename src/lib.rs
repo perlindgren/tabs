@@ -1,8 +1,9 @@
+use core::marker::PhantomData;
 mod note;
 use note::*;
 
 pub trait Tuning {
-    fn tuning(&self) -> &[Note];
+    fn tuning() -> &'static [Note];
 }
 
 #[derive(Debug)]
@@ -20,7 +21,7 @@ impl EADGBE {
 }
 
 impl Tuning for EADGBE {
-    fn tuning(&self) -> &[Note] {
+    fn tuning() -> &'static [Note] {
         &EADGBE::ROOT_NOTES
     }
 }
@@ -38,7 +39,7 @@ impl EADG {
 }
 
 impl Tuning for EADG {
-    fn tuning(&self) -> &[Note] {
+    fn tuning() -> &'static [Note] {
         &EADG::ROOT_NOTES
     }
 }
@@ -54,7 +55,22 @@ where
     pub fret: u8,         // the fret index for the note, 0 for open string
     pub start: f32,       // start time in beats, 3.0 denotes a note struct at beat 3
     pub ext: Option<f32>, // off time
-    pub tuning: T,
+    pub _marker: PhantomData<T>,
+}
+
+impl<T> FretNote<T>
+where
+    T: Tuning,
+{
+    pub fn new(string: u8, fret: u8, start: f32, ext: Option<f32>) -> Self {
+        FretNote {
+            string,
+            fret,
+            start,
+            ext,
+            _marker: PhantomData,
+        }
+    }
 }
 
 impl<T> From<&FretNote<T>> for Note
@@ -62,7 +78,7 @@ where
     T: Tuning,
 {
     fn from(note: &FretNote<T>) -> Self {
-        note.tuning.tuning()[note.string as usize] + note.fret.into()
+        T::tuning()[note.string as usize] + note.fret.into()
     }
 }
 
@@ -71,7 +87,7 @@ where
     T: Tuning,
 {
     fn from(note: FretNote<T>) -> Self {
-        note.tuning.tuning()[note.string as usize] + note.fret.into()
+        T::tuning()[note.string as usize] + note.fret.into()
     }
 }
 
@@ -85,13 +101,7 @@ mod test {
 
     #[test]
     fn test_hz() {
-        let fret_note: FretNote<EADGBE> = FretNote {
-            string: 1,
-            fret: 0,
-            start: 10.0,
-            ext: Some(11.0),
-            tuning: EADGBE {},
-        };
+        let fret_note: FretNote<EADGBE> = FretNote::new(1, 0, 0.0, None);
 
         let note: Note = (&fret_note).into();
 
@@ -102,13 +112,7 @@ mod test {
 
     #[test]
     fn test_from() {
-        let n = FretNote::<EADGBE> {
-            string: 0,
-            fret: 3,
-            start: 10.0,
-            ext: Some(11.0),
-            tuning: EADGBE {},
-        };
+        let n = FretNote::<EADGBE>::new(0, 3, 0.0, None);
 
         let oct: Note = 12.into();
         let one: Note = 8.into();
@@ -123,79 +127,19 @@ mod test {
     }
 }
 
-// impl Default for Notes<6, EADGBE> {
-//     fn default() -> Self {
-//         Notes(vec![
-//             FretNote {
-//                 string: 0,
-//                 fret: 3,
-//                 start: 0.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 1,
-//                 fret: 1,
-//                 start: 1.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 2,
-//                 fret: 0,
-//                 start: 2.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 3,
-//                 fret: 5,
-//                 start: 3.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 4,
-//                 fret: 2,
-//                 start: 4.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 5,
-//                 fret: 2,
-//                 start: 4.0,
-//                 ext: Some(4.5),
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 1,
-//                 fret: 2,
-//                 start: 5.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 1,
-//                 fret: 3,
-//                 start: 5.25,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 2,
-//                 fret: 3,
-//                 start: 6.0,
-//                 ext: None,
-//                 _marker: PhantomData,
-//             },
-//             FretNote {
-//                 string: 2,
-//                 fret: 10,
-//                 start: 10.0,
-//                 ext: Some(11.0),
-//                 _marker: PhantomData,
-//             },
-//         ])
-//     }
-// }
+impl Default for FretNotes<EADGBE> {
+    fn default() -> Self {
+        FretNotes(vec![
+            FretNote::new(0, 3, 0.0, None),
+            FretNote::new(1, 1, 1.0, None),
+            FretNote::new(2, 3, 3.0, None),
+            FretNote::new(3, 5, 3.0, None),
+            FretNote::new(4, 2, 4.0, None),
+            FretNote::new(5, 2, 4.5, None),
+            FretNote::new(2, 6, 5.0, None),
+            FretNote::new(1, 3, 5.25, None),
+            FretNote::new(2, 3, 6.0, None),
+            FretNote::new(2, 10, 10.0, Some(11.0)),
+        ])
+    }
+}
