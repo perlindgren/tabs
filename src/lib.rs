@@ -95,6 +95,23 @@ pub struct FretNotes<T>(pub Vec<FretNote<T>>)
 where
     T: Tuning;
 
+impl Default for FretNotes<EADGBE> {
+    fn default() -> Self {
+        FretNotes(vec![
+            FretNote::new(0, 3, 0.0, None),
+            FretNote::new(1, 1, 1.0, None),
+            FretNote::new(2, 3, 3.0, None),
+            FretNote::new(3, 5, 3.0, None),
+            FretNote::new(4, 2, 4.0, None),
+            FretNote::new(5, 2, 4.5, None),
+            FretNote::new(2, 6, 5.0, None),
+            FretNote::new(1, 3, 5.25, None),
+            FretNote::new(2, 3, 6.0, None),
+            FretNote::new(2, 10, 10.0, Some(11.0)),
+        ])
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -124,22 +141,5 @@ mod test {
         println!("s {:?}", s);
         let max: Note = 255.into();
         println!("max {:?}", max);
-    }
-}
-
-impl Default for FretNotes<EADGBE> {
-    fn default() -> Self {
-        FretNotes(vec![
-            FretNote::new(0, 3, 0.0, None),
-            FretNote::new(1, 1, 1.0, None),
-            FretNote::new(2, 3, 3.0, None),
-            FretNote::new(3, 5, 3.0, None),
-            FretNote::new(4, 2, 4.0, None),
-            FretNote::new(5, 2, 4.5, None),
-            FretNote::new(2, 6, 5.0, None),
-            FretNote::new(1, 3, 5.25, None),
-            FretNote::new(2, 3, 6.0, None),
-            FretNote::new(2, 10, 10.0, Some(11.0)),
-        ])
     }
 }
