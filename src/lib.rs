@@ -3,21 +3,21 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::convert::TryFrom;
 use std::ops::{Add, Sub};
 
-trait StringInstrument<const N: usize, T>
-where
-    T: Tuning<N>,
-{
-}
+// trait StringInstrument<const N: usize, T>
+// where
+//     T: Tuning<N>,
+// {
+// }
 
-impl<T> StringInstrument<6, T> for Guitar6String<T> where T: Tuning<6> {}
-impl<T> StringInstrument<4, T> for Base4String<T> where T: Tuning<4> {}
+// impl<T> StringInstrument<6, T> for Guitar6String<T> where T: Tuning<6> {}
+// impl<T> StringInstrument<4, T> for Base4String<T> where T: Tuning<4> {}
 
-trait Tuning<const N: usize> {
+pub trait Tuning<const N: usize> {
     const BASE_NOTES: [Note; N];
 }
 
 #[derive(Debug)]
-struct EADGBE {}
+pub struct EADGBE {}
 
 impl Tuning<6> for EADGBE {
     const BASE_NOTES: [Note; 6] = [
@@ -133,7 +133,7 @@ enum SemiTone {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct Note {
+pub struct Note {
     semi_tone: SemiTone,
     octave: u8,
 }

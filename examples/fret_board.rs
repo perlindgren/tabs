@@ -2,7 +2,10 @@
 
 use eframe::egui;
 use egui::Stroke;
-use std::time::{Duration, Instant};
+use std::{
+    // marker::PhantomData,
+    time::{Duration, Instant},
+};
 
 use egui::*;
 use log::*;
@@ -17,22 +20,29 @@ fn main() -> Result<(), eframe::Error> {
         // vsync: false,
         ..Default::default()
     };
+
     eframe::run_native(
         "Fret Test",
         options,
-        Box::new(|cc| Ok(Box::new(MyApp::new(cc)))),
+        Box::new(|cc| {
+            let app: MyApp<6, EADGBE> = MyApp::new(cc);
+            Ok(Box::new(app))
+        }),
     )
 }
 
-struct MyApp {
-    fret_board: FretBoard,
+struct MyApp<const N: usize, T>
+where
+    T: Tuning<N>,
+{
+    fret_board: FretBoard<N, T>,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
     start_instant: Instant,
 }
 
-impl MyApp {
+impl MyApp<6, EADGBE> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             fret_board: FretBoard::default(),
@@ -44,7 +54,10 @@ impl MyApp {
     }
 }
 
-impl eframe::App for MyApp {
+impl<const N: usize, T> eframe::App for MyApp<N, T>
+where
+    T: Tuning<N>,
+{
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let now = Instant::now();
@@ -81,17 +94,22 @@ impl eframe::App for MyApp {
     }
 }
 
-struct FretBoard {
+struct FretBoard<const N: usize, T>
+where
+    T: Tuning<N>,
+{
     config: Config,
     nr_frets: u8,
-    notes: Notes, // perhaps we should use some btree for sorted data structure
+    notes: Notes<N, T>, // perhaps we should use some btree for sorted data structure
+                        // _marker: PhantomData<T>,
 }
 
-impl Default for FretBoard {
+impl Default for FretBoard<6, EADGBE> {
     fn default() -> Self {
         Self {
             config: Config::default(),
             nr_frets: 6,
+            // notes: Notes(vec![]), // Notes<N, T>::default(),
             notes: Notes::default(),
         }
     }
@@ -130,7 +148,10 @@ impl Default for Config {
     }
 }
 
-impl FretBoard {
+impl<const N: usize, T> FretBoard<N, T>
+where
+    T: Tuning<N>,
+{
     pub fn ui_content(&mut self, ui: &mut Ui, play_head: f32) -> egui::Response {
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
@@ -180,7 +201,7 @@ impl FretBoard {
             //
             if n.fret > 0 {
                 if let Some(fret) = self.config.frets.get(n.fret as usize - 1) {
-                    debug!("note n {:?}, fret {:?}", n, fret);
+                    // debug!("note n {:?}, fret {:?}", n, fret);
                     let y = string_space * (0.5 + n.string as f32) + rect.top();
 
                     painter.circle(
