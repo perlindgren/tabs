@@ -25,7 +25,7 @@ fn main() -> Result<(), eframe::Error> {
 }
 
 struct MyApp {
-    fret_board: FretBoard,
+    fret_board: FretBoard<EADGBE>,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
@@ -81,19 +81,22 @@ impl eframe::App for MyApp {
     }
 }
 
-struct FretBoard {
+struct FretBoard<T>
+where
+    T: Tuning,
+{
     config: Config,
     nr_frets: u8,
-    notes: Notes, // perhaps we should use some btree for sorted data structure
+    notes: FretNotes<T>, // perhaps we should use some btree for sorted data structure
 }
 
-impl Default for FretBoard {
+impl Default for FretBoard<EADGBE> {
     fn default() -> Self {
         Self {
             config: Config::default(),
             nr_frets: 6,
 
-            notes: Notes::default(),
+            notes: FretNotes::default(),
         }
     }
 }
@@ -113,7 +116,10 @@ impl Default for Config {
     }
 }
 
-impl FretBoard {
+impl<T> FretBoard<T>
+where
+    T: Tuning,
+{
     pub fn ui_content(&mut self, ui: &mut Ui, play_head: f32) -> egui::Response {
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
