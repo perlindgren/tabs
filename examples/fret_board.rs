@@ -25,24 +25,24 @@ fn main() -> Result<(), eframe::Error> {
         "Fret Test",
         options,
         Box::new(|cc| {
-            let app: MyApp<6, EADGBE> = MyApp::new(cc);
+            let app: MyApp<EADGBE> = MyApp::new(cc);
             Ok(Box::new(app))
         }),
     )
 }
 
-struct MyApp<const N: usize, T>
+struct MyApp<T>
 where
-    T: Tuning<N>,
+    T: Tuning,
 {
-    fret_board: FretBoard<N, T>,
+    fret_board: FretBoard<T>,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
     start_instant: Instant,
 }
 
-impl MyApp<6, EADGBE> {
+impl MyApp<EADGBE> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             fret_board: FretBoard::default(),
@@ -54,9 +54,9 @@ impl MyApp<6, EADGBE> {
     }
 }
 
-impl<const N: usize, T> eframe::App for MyApp<N, T>
+impl<T> eframe::App for MyApp<T>
 where
-    T: Tuning<N>,
+    T: Tuning,
 {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -72,9 +72,9 @@ where
 
             ui.label(format!("Freq: {:?}", f));
 
-            if f < 59 || f > 61 {
-                debug!("frame-rate {}", f);
-            }
+            // if f < 59 || f > 61 {
+            //     debug!("frame-rate {}", f);
+            // }
 
             ui.label(format!("Transport: {:?}", transport));
             ui.label(format!("Beat {}, Pos {}", 1 + beat as u32 % 4, beat as u32));
@@ -94,23 +94,23 @@ where
     }
 }
 
-struct FretBoard<const N: usize, T>
+struct FretBoard<T>
 where
-    T: Tuning<N>,
+    T: Tuning,
 {
     config: Config,
     nr_frets: u8,
-    notes: Notes<N, T>, // perhaps we should use some btree for sorted data structure
-                        // _marker: PhantomData<T>,
+    notes: FretNotes<T>, // perhaps we should use some btree for sorted data structure
+                         // _marker: PhantomData<T>,
 }
 
-impl Default for FretBoard<6, EADGBE> {
+impl Default for FretBoard<EADGBE> {
     fn default() -> Self {
         Self {
             config: Config::default(),
             nr_frets: 6,
             // notes: Notes(vec![]), // Notes<N, T>::default(),
-            notes: Notes::default(),
+            notes: FretNotes::default(),
         }
     }
 }
@@ -148,11 +148,11 @@ impl Default for Config {
     }
 }
 
-impl<const N: usize, T> FretBoard<N, T>
+impl<T> FretBoard<T>
 where
-    T: Tuning<N>,
+    T: Tuning,
 {
-    pub fn ui_content(&mut self, ui: &mut Ui, play_head: f32) -> egui::Response {
+    pub fn ui_content(&mut self, ui: &mut Ui, _play_head: f32) -> egui::Response {
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
         let rect = response.rect;
