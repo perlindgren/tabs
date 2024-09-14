@@ -1,9 +1,38 @@
 use core::marker::PhantomData;
 mod note;
-use note::*;
+pub use note::*;
 
-pub trait Tuning {
-    fn tuning() -> &'static [Note];
+#[derive(Debug, Copy, Clone)]
+pub struct Tuning {
+    pub tuning: [Note; 6],
+}
+
+impl Tuning {
+    fn tuning(&self) -> &'static [Note] {
+        &self.tuning
+    }
+    fn from_notes(notes: Vec<Note>) -> Tuning {
+        match notes.len() {
+            4 => {
+                //bass case
+                if notes.as_slice() == EADG::ROOT_NOTES {
+                    Tuning {
+                        tuning: EADG::ROOT_NOTES,
+                    }
+                }
+            }
+            6 => {
+                if notes.as_slice() == EADGBE::ROOT_NOTES {
+                    Tuning {
+                        tuning: EADGBE::ROOT_NOTES,
+                    }
+                } else {
+                    panic!("Unsupported tuning {:?}", notes);
+                }
+            }
+            _ => panic!("Unsupported tuning: {:?}", notes),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -20,12 +49,6 @@ impl EADGBE {
     ];
 }
 
-impl Tuning for EADGBE {
-    fn tuning() -> &'static [Note] {
-        &EADGBE::ROOT_NOTES
-    }
-}
-
 #[derive(Debug)]
 pub struct EADG {}
 
@@ -38,42 +61,31 @@ impl EADG {
     ];
 }
 
-impl Tuning for EADG {
-    fn tuning() -> &'static [Note] {
-        &EADG::ROOT_NOTES
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
-pub struct FretNote<T>
-where
-    T: Tuning,
-{
+pub struct FretNote {
     // string index typically 0..3 for base, 0..5 for guitar,
     // 0 is the lowest string for now
     pub string: u8,
     pub fret: u8,         // the fret index for the note, 0 for open string
     pub start: f32,       // start time in beats, 3.0 denotes a note struct at beat 3
     pub ext: Option<f32>, // off time
-    pub _marker: PhantomData<T>,
+    pub tuning: Tuning,
+    //pub _marker: PhantomData<T>,
 }
 
-impl<T> FretNote<T>
-where
-    T: Tuning,
-{
-    pub fn new(string: u8, fret: u8, start: f32, ext: Option<f32>) -> Self {
+impl FretNote {
+    pub fn new(string: u8, fret: u8, start: f32, ext: Option<f32>, tuning: Tuning) -> Self {
         FretNote {
             string,
             fret,
             start,
             ext,
-            _marker: PhantomData,
+            tuning, //_marker: PhantomData,
         }
     }
 }
 
-impl<T> From<&FretNote<T>> for Note
+impl From<FretNote> for Note
 where
     T: Tuning,
 {
@@ -91,11 +103,9 @@ where
     }
 }
 
-pub struct FretNotes<T>(pub Vec<FretNote<T>>)
-where
-    T: Tuning;
+pub struct FretNotes(pub Vec<FretNote>);
 
-impl Default for FretNotes<EADGBE> {
+impl Default for FretNotes {
     fn default() -> Self {
         FretNotes(vec![
             FretNote::new(0, 3, 0.0, None),

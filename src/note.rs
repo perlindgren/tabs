@@ -21,7 +21,7 @@ pub enum SemiTone {
     B,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Note {
     semi_tone: SemiTone,
     octave: u8,
@@ -82,6 +82,39 @@ impl From<Note> for Hz {
         let freq_diff = exp.exp2();
 
         Hz(freq_diff as f32 * 27.5)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct MidiNote(pub u32);
+
+impl From<MidiNote> for Note {
+    fn from(value: MidiNote) -> Self {
+        let id = value.0;
+        let semitone = id % 12;
+        let semitone = match semitone {
+            0 => SemiTone::C,
+            1 => SemiTone::CSharpDFlat,
+            2 => SemiTone::D,
+            3 => SemiTone::DSharpEFlat,
+            4 => SemiTone::E,
+            5 => SemiTone::F,
+            6 => SemiTone::FSharpGFlat,
+            7 => SemiTone::G,
+            8 => SemiTone::GSharpAFlat,
+            9 => SemiTone::A,
+            10 => SemiTone::ASharpBFlat,
+            11 => SemiTone::B,
+            12 => SemiTone::C,
+            _ => unreachable!(),
+        };
+        // 0th is C,,,
+        let octave = ((id - id % 12) / 12) - 1;
+
+        Note {
+            semi_tone: semitone.into(),
+            octave: octave as u8,
+        }
     }
 }
 
