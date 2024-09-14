@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = "1.0.88"
+clap = { version = "4.5.17", features = ["derive"] }
+cpal = { version = "0.15.3", features = ["jack"] }
 eframe = "0.28.1"
 egui = { version = "0.28.1", features = ["serde"] }
 egui_extras = "0.28.1"
@@ -15,4 +18,5 @@ log = { version = "0.4.22" }
 num_enum = "0.7.3"
 rand = "0.8.5"
 realfft = "3.3.0"
+ringbuf = "0.4.4"
 splines = { version = "4.3.1" }
