@@ -1,7 +1,6 @@
 use clap::Parser;
 use scorelib::gp;
 use std::{fs, io::Read, path::Path};
-use tabs::FretNotes;
 #[derive(Parser, Debug)]
 struct Args {
     #[clap(short = 'p', long, help = "Input file path")]
@@ -40,20 +39,16 @@ fn main() {
     let track = song.tracks.get(choice).unwrap();
     println!("Picked track: {}", track.name);
 
-    use tabs::{MidiNote, Note, Tuning, EADGBE};
+    use tabs::{MidiNote, Note};
 
     let mut strings: Vec<MidiNote> = vec![];
 
     for s in &track.strings {
-        println!("{:?}", s);
         strings.push(MidiNote(s.1 as u32));
     }
 
     let strings: Vec<Note> = strings.iter().map(|item| (*item).into()).collect();
-    let tuning = <EADGBE as Tuning>::from_notes(strings);
-
-    let f: FretNotes = todo!();
-    println!("Tuning: {:?}");
+    println!("Tuning: {:?}", strings);
 }
 
 use std::io::{stdin, stdout, Write};
