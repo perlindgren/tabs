@@ -91,8 +91,11 @@ mod test {
 
     #[test]
     fn test_hz() {
-        let note = Note::new(SemiTone::E, 2);
+        let note = Note::new(SemiTone::E, 1);
         let hz: Hz = note.into();
-        println!("note {:?}, freq {:?}", note, hz)
+        println!("note {:?}, freq {:?}", note, hz);
+        let note = note + 1.into();
+        let hz: Hz = note.into();
+        println!("note {:?}, freq {:?}", note, hz);
     }
 }

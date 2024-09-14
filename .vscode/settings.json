@@ -2,9 +2,11 @@
   "cSpell.ignoreWords": [
     "EADG",
     "EADGBE",
+    "consts",
     "eframe",
     "egui",
     "libm",
+    "realfft",
     "repr",
     "vline",
     "vsync"
