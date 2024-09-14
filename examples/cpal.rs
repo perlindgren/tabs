@@ -118,6 +118,8 @@ impl eframe::App for MyApp {
             self.fft_in_data[..self.ptr].copy_from_slice(&self.in_data[FS - self.ptr..]);
             self.fft_in_data[self.ptr..].copy_from_slice(&self.in_data[..FS - self.ptr]);
 
+            // self.fft_in_data[1024..].copy_from_slice(&[0.0; FS - 1024]);
+
             self.r2c
                 .process(&mut self.fft_in_data, &mut self.spectrum)
                 .unwrap();
