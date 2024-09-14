@@ -8,6 +8,7 @@
     "libm",
     "realfft",
     "repr",
+    "ringbuf",
     "vline",
     "vsync"
   ]

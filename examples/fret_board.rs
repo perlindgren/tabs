@@ -212,42 +212,6 @@ where
                     );
                 }
             }
-
-            //     let y = string_space * (0.5 + n.fret as f32) + rect.top();
-            //     let c = (rect.left() + (n.on - play_head) * bar_pixels, y).into();
-
-            //     if n.on > play_head + self.config.beats || n.on < play_head {
-            //         trace!("skipping {}", n.on);
-            //     }
-            //     if let Some(ext) = n.ext {
-            //         let top = string_space * (n.fret as f32) + rect.top();
-            //         let bottom = string_space * (1.0 + n.fret as f32) + rect.top();
-            //         let left = rect.left() + (n.on - play_head) * bar_pixels - string_space * 0.5;
-            //         let right = rect.left() + (ext - play_head) * bar_pixels + string_space * 0.5;
-
-            //         painter.rect(
-            //             [(left, top).into(), (right, bottom).into()].into(),
-            //             string_space * 0.1,
-            //             Color32::LIGHT_RED,
-            //             note_stroke,
-            //         );
-            //         painter.text(
-            //             c,
-            //             Align2::CENTER_CENTER,
-            //             format!("{}", n.pos),
-            //             FontId::monospace(string_space * 0.4),
-            //             Color32::WHITE,
-            //         );
-            //     } else {
-            //         painter.circle(c, string_space / 2.0, Color32::LIGHT_RED, note_stroke);
-            //         painter.text(
-            //             c,
-            //             Align2::CENTER_CENTER,
-            //             format!("{}", n.pos),
-            //             FontId::monospace(string_space * 0.4),
-            //             Color32::WHITE,
-            //         );
-            //     }
         }
 
         // painter.debug_rect(rect, Color32::RED, "here");
@@ -259,14 +223,6 @@ where
 mod test {
 
     use crate::Config;
-
-    #[test]
-    fn fmod() {
-        let range = 2.0;
-        for i in 0..20 {
-            println!("{}", range + (i as f32 * 1.05) % range);
-        }
-    }
 
     #[test]
     fn test_config() {
