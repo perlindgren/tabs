@@ -108,17 +108,17 @@ impl MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            let mut i = 0;
             while let Some(s) = self.consumer.dequeue() {
-                self.in_data[self.ptr] = s;
-                self.ptr = (self.ptr + 1) % FS;
+                self.fft_in_data[i] = s;
+                i += 1;
             }
 
-            ui.label(format!("ptr {}", self.ptr));
+            for j in i..FS {
+                self.fft_in_data[j] = 0.0;
+            }
 
-            self.fft_in_data[..self.ptr].copy_from_slice(&self.in_data[FS - self.ptr..]);
-            self.fft_in_data[self.ptr..].copy_from_slice(&self.in_data[..FS - self.ptr]);
-
-            // self.fft_in_data[1024..].copy_from_slice(&[0.0; FS - 1024]);
+            ui.label(format!("ptr {}", i));
 
             self.r2c
                 .process(&mut self.fft_in_data, &mut self.spectrum)
