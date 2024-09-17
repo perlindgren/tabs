@@ -31,18 +31,18 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-struct MyApp<T>
+struct MyApp<'a, T>
 where
     T: Tuning,
 {
-    fret_board: FretBoard<T>,
+    fret_board: FretBoard<'a, T>,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
     start_instant: Instant,
 }
 
-impl MyApp<EADGBE> {
+impl<'a> MyApp<'a, EADGBE> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             fret_board: FretBoard::default(),
@@ -54,7 +54,7 @@ impl MyApp<EADGBE> {
     }
 }
 
-impl<T> eframe::App for MyApp<T>
+impl<'a, T> eframe::App for MyApp<'a, T>
 where
     T: Tuning,
 {
@@ -94,17 +94,17 @@ where
     }
 }
 
-struct FretBoard<T>
+struct FretBoard<'a, T>
 where
     T: Tuning,
 {
     config: Config,
     nr_frets: u8,
-    notes: FretNotes<T>, // perhaps we should use some btree for sorted data structure
-                         // _marker: PhantomData<T>,
+    notes: FretNotes<'a, T>, // perhaps we should use some btree for sorted data structure
+                             // _marker: PhantomData<T>,
 }
 
-impl Default for FretBoard<EADGBE> {
+impl<'a> Default for FretBoard<'a, EADGBE> {
     fn default() -> Self {
         Self {
             config: Config::default(),
@@ -148,7 +148,7 @@ impl Default for Config {
     }
 }
 
-impl<T> FretBoard<T>
+impl<'a, T> FretBoard<'a, T>
 where
     T: Tuning,
 {

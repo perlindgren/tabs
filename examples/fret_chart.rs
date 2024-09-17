@@ -24,15 +24,15 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-struct MyApp {
-    fret_board: FretBoard<EADGBE>,
+struct MyApp<'a> {
+    fret_board: FretBoard<'a, EADGBE>,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
     start_instant: Instant,
 }
 
-impl MyApp {
+impl<'a> MyApp<'a> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             fret_board: FretBoard::default(),
@@ -44,7 +44,7 @@ impl MyApp {
     }
 }
 
-impl eframe::App for MyApp {
+impl<'a> eframe::App for MyApp<'a> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let now = Instant::now();
@@ -81,16 +81,16 @@ impl eframe::App for MyApp {
     }
 }
 
-struct FretBoard<T>
+struct FretBoard<'a, T>
 where
     T: Tuning,
 {
     config: Config,
     nr_frets: u8,
-    notes: FretNotes<T>, // perhaps we should use some btree for sorted data structure
+    notes: FretNotes<'a, T>, // perhaps we should use some btree for sorted data structure
 }
 
-impl Default for FretBoard<EADGBE> {
+impl<'a> Default for FretBoard<'a, EADGBE> {
     fn default() -> Self {
         Self {
             config: Config::default(),
@@ -116,7 +116,7 @@ impl Default for Config {
     }
 }
 
-impl<T> FretBoard<T>
+impl<'a, T> FretBoard<'a, T>
 where
     T: Tuning,
 {
@@ -220,15 +220,8 @@ where
             }
         }
 
-        // painter.debug_rect(rect, Color32::RED, "here");
         response
     }
-
-    // we assume play head to be displayed one bar in
-    // #[inline(always)]
-    // pub fn beat_to_pos(&self, play_head: f32, beat: f32) -> f32 {
-    //     self.config.beat_pixels * (beat - play_head)
-    // }
 }
 
 #[cfg(test)]
