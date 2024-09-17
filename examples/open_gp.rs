@@ -40,7 +40,7 @@ fn main() {
     let track = song.tracks.get(choice).unwrap();
     println!("Picked track: {}", track.name);
 
-    use tabs::{MidiNote, Note, SemiTone, Tuning};
+    use tabs::{MidiNote, Note, Tuning};
 
     let mut strings: Vec<MidiNote> = vec![];
 
@@ -50,9 +50,30 @@ fn main() {
 
     let strings: Vec<Note> = strings.iter().map(|item| (*item).into()).collect();
 
-    let some_bool = strings.get(0).unwrap() == &Note::new(SemiTone::E, 2);
-    let smthn: &dyn Tuning = if some_bool { &EADGBE {} } else { &EADG {} };
-    println!("Tuning: {:?}", smthn.tuning());
+    let eadgbe = EADGBE {};
+    let eadg = EADG {};
+    let tuning: &dyn Tuning = if strings.as_slice() == eadgbe.tuning() {
+        &eadgbe
+    } else if strings.as_slice() == eadg.tuning() {
+        &eadg
+    } else {
+        panic!("Unsupported tuning")
+    };
+    println!("Tuning: {:?}", tuning.tuning());
+    let measure = track.measures.get(0).unwrap();
+    let measure_1 = track.measures.get(1).unwrap();
+    let voice = measure.voices.get(0).unwrap();
+    let voice_1 = measure_1.voices.get(0).unwrap();
+    for beat in &voice.beats {
+        println!("--------------------------------------------------------------------------");
+        println!("Beat: {:?}", beat.notes);
+        println!("Duration: {:?}", beat.duration);
+    }
+    for beat in &voice_1.beats {
+        println!("--------------------------------------------------------------------------");
+        println!("Beat: {:?}", beat.notes);
+        println!("Duration: {:?}", beat.duration);
+    }
 }
 
 use std::io::{stdin, stdout, Write};

@@ -1,4 +1,5 @@
 use core::marker::PhantomData;
+use std::fmt::Debug;
 mod note;
 pub use note::*;
 
@@ -6,22 +7,29 @@ pub trait Tuning {
     fn tuning(&self) -> &'static [Note];
 }
 
+impl Debug for dyn Tuning {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Tuning:{:?}", self.tuning());
+        Ok(())
+    }
+}
+
 pub enum Tunings {
     EADGBE,
     EADG,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct EADGBE {}
 
 impl EADGBE {
     const ROOT_NOTES: [Note; 6] = [
         Note::new(SemiTone::E, 2),
         Note::new(SemiTone::A, 2),
-        Note::new(SemiTone::D, 2),
-        Note::new(SemiTone::G, 2),
-        Note::new(SemiTone::B, 2),
-        Note::new(SemiTone::E, 3),
+        Note::new(SemiTone::D, 3),
+        Note::new(SemiTone::G, 3),
+        Note::new(SemiTone::B, 3),
+        Note::new(SemiTone::E, 4),
     ];
 }
 
@@ -31,7 +39,7 @@ impl Tuning for EADGBE {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct EADG {}
 
 impl EADG {
@@ -49,62 +57,53 @@ impl Tuning for EADG {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct FretNote<'a, T>
-where
-    T: Tuning,
-{
+#[derive(Debug, Clone)]
+pub struct FretNote<'a> {
     // string index typically 0..3 for base, 0..5 for guitar,
     // 0 is the lowest string for now
     pub string: u8,
     pub fret: u8,         // the fret index for the note, 0 for open string
     pub start: f32,       // start time in beats, 3.0 denotes a note struct at beat 3
     pub ext: Option<f32>, // off time
-    pub tuning: &'a T,
-    pub _marker: PhantomData<T>,
+    pub tuning: &'a Box<dyn Tuning>,
 }
 
-impl<'a, T> FretNote<'a, T>
-where
-    T: Tuning,
-{
-    pub fn new(string: u8, fret: u8, start: f32, ext: Option<f32>, tuning: &'a T) -> Self {
+impl<'a> FretNote<'a> {
+    pub fn new(
+        string: u8,
+        fret: u8,
+        start: f32,
+        ext: Option<f32>,
+        tuning: &'a Box<dyn Tuning>,
+    ) -> Self {
         FretNote {
             string,
             fret,
             start,
             ext,
             tuning,
-            _marker: PhantomData,
         }
     }
 }
 
-impl<'a, T> From<&FretNote<'a, T>> for Note
-where
-    T: Tuning,
-{
-    fn from(note: &FretNote<T>) -> Self {
+impl<'a> From<&FretNote<'a>> for Note {
+    fn from(note: &FretNote) -> Self {
         note.tuning.tuning()[note.string as usize] + note.fret.into()
     }
 }
 
-impl<'a, T> From<FretNote<'a, T>> for Note
-where
-    T: Tuning,
-{
-    fn from(note: FretNote<T>) -> Self {
+impl<'a> From<FretNote<'a>> for Note {
+    fn from(note: FretNote) -> Self {
         note.tuning.tuning()[note.string as usize] + note.fret.into()
     }
 }
 
-pub struct FretNotes<'a, T>(pub Vec<FretNote<'a, T>>)
-where
-    T: Tuning;
-
+pub struct FretNotes<'a>(pub Vec<FretNote<'a>>);
+/*
 impl<'a> Default for FretNotes<'a, EADGBE> {
     fn default() -> Self {
-        let tuning = &EADGBE {};
+        static TUNING: EADGBE = EADGBE {};
+        let tuning = &Box::new(TUNING);
         FretNotes(vec![
             FretNote::new(0, 3, 0.0, None, tuning),
             FretNote::new(1, 1, 1.0, None, tuning),
@@ -118,7 +117,7 @@ impl<'a> Default for FretNotes<'a, EADGBE> {
             FretNote::new(2, 10, 10.0, Some(11.0), tuning),
         ])
     }
-}
+}*/
 
 #[cfg(test)]
 mod test {
@@ -126,8 +125,9 @@ mod test {
 
     #[test]
     fn test_hz() {
-        let tuning = &EADGBE {};
-        let fret_note: FretNote<EADGBE> = FretNote::new(1, 0, 0.0, None, tuning);
+        let eadgbe = EADGBE {};
+        let tuning: Box<dyn Tuning> = Box::new(eadgbe);
+        let fret_note: FretNote = FretNote::new(1, 0, 0.0, None, &tuning);
 
         let note: Note = (&fret_note).into();
 
@@ -138,8 +138,8 @@ mod test {
 
     #[test]
     fn test_from() {
-        let tuning = &EADGBE {};
-        let n = FretNote::<EADGBE>::new(0, 3, 0.0, None, tuning);
+        let tuning: Box<dyn Tuning> = Box::new(EADGBE {});
+        let n = FretNote::new(0, 3, 0.0, None, &tuning);
 
         let oct: Note = 12.into();
         let one: Note = 8.into();

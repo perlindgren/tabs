@@ -4,14 +4,22 @@ use eframe::egui;
 use egui::Stroke;
 use std::time::{Duration, Instant};
 
+use clap::Parser;
 use egui::*;
 use log::*;
+use scorelib::gp;
+use std::{fs, io::Read, path::Path};
 use tabs::*;
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[clap(short = 'p', long, help = "Input file path")]
+    path: String,
+}
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
     trace!("env_logger started");
-
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1920.0, 540.0]),
         // vsync: false,
@@ -34,8 +42,91 @@ struct MyApp<'a> {
 
 impl<'a> MyApp<'a> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        let args: Args = Args::parse();
+        let mut song: gp::Song = gp::Song::default();
+        let f = Path::new(&args.path);
+        let ext = f.extension().unwrap().to_str().unwrap();
+        println!("{}", ext);
+        let f = fs::File::open(f).unwrap();
+        let mut data: Vec<u8> = vec![];
+        for b in f.bytes() {
+            data.push(b.unwrap());
+        }
+
+        match ext {
+            "gp3" => song.read_gp3(&data),
+            "gp4" => song.read_gp4(&data),
+            "gp5" => song.read_gp5(&data),
+            _ => {
+                panic!("Invalid file extension (currently only .gp3, .gp4, .gp5 are supported)")
+            }
+        }
+        println!("Operned song {} by {}", song.name, song.artist);
+
+        for (i, track) in song.tracks.clone().into_iter().enumerate() {
+            println!("[{}]: {}", i, track.name);
+        }
+
+        println!("Pick track:");
+        let choice = get_input();
+        let track = song.tracks.get(choice).unwrap();
+        println!("Picked track: {}", track.name);
+
+        let mut strings: Vec<MidiNote> = vec![];
+
+        for s in &track.strings {
+            strings.push(MidiNote(s.1 as u32));
+        }
+
+        let strings: Vec<Note> = strings.iter().map(|item| (*item).into()).collect();
+
+        let eadgbe = EADGBE {};
+        let eadg = EADG {};
+        println!("{:?}", eadgbe.tuning());
+        println!("{:?}", strings.as_slice());
+        let tuning: Box<dyn Tuning> = if strings.as_slice() == eadgbe.tuning() {
+            Box::new(eadgbe)
+        } else if strings.as_slice() == eadg.tuning() {
+            Box::new(eadg)
+        } else {
+            panic!("Unsupported tuning")
+        };
+        println!("Tuning: {:?}", tuning.tuning());
+        let measure = track.measures.get(0).unwrap();
+        let measure_1 = track.measures.get(1).unwrap();
+        let voice = measure.voices.get(0).unwrap();
+        let voice_1 = measure_1.voices.get(0).unwrap();
+        let mut fretnotes = vec![];
+        let mut current_time = 0;
+        let tuning = &tuning;
+        for beat in &voice.beats {
+            println!("--------------------------------------------------------------------------");
+            println!("Beat: {:?}", beat.notes);
+            for note in &beat.notes {
+                let fretnote = FretNote::new(
+                    note.string as u8,
+                    note.value as u8,
+                    current_time as f32,
+                    None,
+                    tuning,
+                );
+                fretnotes.push(fretnote);
+            }
+            println!("Duration: {:?}", beat.duration);
+            println!("Absolute Time: {}", current_time);
+            current_time += beat.duration.value as u64;
+        }
+        for beat in &voice_1.beats {
+            println!("--------------------------------------------------------------------------");
+            println!("Beat: {:?}", beat.notes);
+            println!("Duration: {:?}", beat.duration);
+            println!("Absolute Time: {}", current_time);
+            current_time += beat.duration.value as u64;
+        }
+        let fretnotes = FretNotes(fretnotes);
+
         Self {
-            fret_board: FretBoard::default(),
+            fret_board: FretBoard::new(fretnotes),
             looping: false,
             time_instant: Instant::now(),
             bpm: 20.0,
@@ -87,17 +178,6 @@ struct FretBoard<'a> {
     notes: FretNotes<'a>, // perhaps we should use some btree for sorted data structure
 }
 
-impl<'a> Default for FretBoard<'a> {
-    fn default() -> Self {
-        Self {
-            config: Config::default(),
-            nr_frets: 6,
-
-            notes: FretNotes(vec![]),
-        }
-    }
-}
-
 #[derive(Debug)]
 struct Config {
     beats: f32,
@@ -114,6 +194,13 @@ impl Default for Config {
 }
 
 impl<'a> FretBoard<'a> {
+    pub fn new(notes: FretNotes<'a>) -> Self {
+        Self {
+            config: Config::default(),
+            nr_frets: 6,
+            notes,
+        }
+    }
     pub fn ui_content(&mut self, ui: &mut Ui, play_head: f32) -> egui::Response {
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
@@ -217,7 +304,16 @@ impl<'a> FretBoard<'a> {
         response
     }
 }
-
+use std::io::{stdin, stdout, Write};
+fn get_input() -> usize {
+    let mut s = String::new();
+    let _ = stdout().flush();
+    stdin()
+        .read_line(&mut s)
+        .expect("Did not enter a correct string");
+    let s = s.strip_suffix("\n").unwrap();
+    s.parse::<usize>().unwrap()
+}
 #[cfg(test)]
 mod test {
     // use crate::FretBoard;
