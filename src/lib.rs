@@ -46,8 +46,8 @@ impl EADG {
     const ROOT_NOTES: [Note; 4] = [
         Note::new(SemiTone::E, 2),
         Note::new(SemiTone::A, 2),
-        Note::new(SemiTone::D, 2),
-        Note::new(SemiTone::G, 2),
+        Note::new(SemiTone::D, 3),
+        Note::new(SemiTone::G, 3),
     ];
 }
 
