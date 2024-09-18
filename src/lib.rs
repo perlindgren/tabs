@@ -1,5 +1,5 @@
 use core::marker::PhantomData;
-use std::fmt::Debug;
+use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
 mod note;
 pub use note::*;
 
@@ -58,23 +58,23 @@ impl Tuning for EADG {
 }
 
 #[derive(Debug, Clone)]
-pub struct FretNote<'a> {
+pub struct FretNote {
     // string index typically 0..3 for base, 0..5 for guitar,
     // 0 is the lowest string for now
     pub string: u8,
     pub fret: u8,         // the fret index for the note, 0 for open string
     pub start: f32,       // start time in beats, 3.0 denotes a note struct at beat 3
     pub ext: Option<f32>, // off time
-    pub tuning: &'a Box<dyn Tuning>,
+    pub tuning: Rc<RefCell<dyn Tuning>>,
 }
 
-impl<'a> FretNote<'a> {
+impl FretNote {
     pub fn new(
         string: u8,
         fret: u8,
         start: f32,
         ext: Option<f32>,
-        tuning: &'a Box<dyn Tuning>,
+        tuning: Rc<RefCell<dyn Tuning>>,
     ) -> Self {
         FretNote {
             string,
@@ -86,19 +86,19 @@ impl<'a> FretNote<'a> {
     }
 }
 
-impl<'a> From<&FretNote<'a>> for Note {
+impl<'a> From<&FretNote> for Note {
     fn from(note: &FretNote) -> Self {
-        note.tuning.tuning()[note.string as usize] + note.fret.into()
+        note.tuning.borrow().tuning()[note.string as usize] + note.fret.into()
     }
 }
 
-impl<'a> From<FretNote<'a>> for Note {
+impl<'a> From<FretNote> for Note {
     fn from(note: FretNote) -> Self {
-        note.tuning.tuning()[note.string as usize] + note.fret.into()
+        note.tuning.borrow().tuning()[note.string as usize] + note.fret.into()
     }
 }
-
-pub struct FretNotes<'a>(pub Vec<FretNote<'a>>);
+#[derive(Debug)]
+pub struct FretNotes(pub Vec<FretNote>);
 /*
 impl<'a> Default for FretNotes<'a, EADGBE> {
     fn default() -> Self {
@@ -121,13 +121,15 @@ impl<'a> Default for FretNotes<'a, EADGBE> {
 
 #[cfg(test)]
 mod test {
+    use std::{cell::RefCell, rc::Rc};
+
     use super::*;
 
     #[test]
     fn test_hz() {
         let eadgbe = EADGBE {};
-        let tuning: Box<dyn Tuning> = Box::new(eadgbe);
-        let fret_note: FretNote = FretNote::new(1, 0, 0.0, None, &tuning);
+        let tuning: Rc<RefCell<dyn Tuning>> = Rc::new(RefCell::new(eadgbe));
+        let fret_note: FretNote = FretNote::new(1, 0, 0.0, None, tuning);
 
         let note: Note = (&fret_note).into();
 
@@ -138,8 +140,8 @@ mod test {
 
     #[test]
     fn test_from() {
-        let tuning: Box<dyn Tuning> = Box::new(EADGBE {});
-        let n = FretNote::new(0, 3, 0.0, None, &tuning);
+        let tuning: Rc<RefCell<dyn Tuning>> = Rc::new(RefCell::new(EADGBE {}));
+        let n = FretNote::new(0, 3, 0.0, None, tuning);
 
         let oct: Note = 12.into();
         let one: Note = 8.into();
