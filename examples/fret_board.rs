@@ -28,15 +28,15 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-struct MyApp<'a> {
-    fret_board: FretBoard<'a>,
+struct MyApp {
+    fret_board: FretBoard,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
     start_instant: Instant,
 }
 
-impl<'a> MyApp<'a> {
+impl MyApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             fret_board: FretBoard::default(),
@@ -48,7 +48,7 @@ impl<'a> MyApp<'a> {
     }
 }
 
-impl<'a> eframe::App for MyApp<'a> {
+impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let now = Instant::now();
@@ -85,14 +85,14 @@ impl<'a> eframe::App for MyApp<'a> {
     }
 }
 
-struct FretBoard<'a> {
+struct FretBoard {
     config: Config,
     nr_frets: u8,
-    notes: FretNotes<'a>, // perhaps we should use some btree for sorted data structure
-                          // _marker: PhantomData<T>,
+    notes: FretNotes, // perhaps we should use some btree for sorted data structure
+                      // _marker: PhantomData<T>,
 }
 
-impl<'a> Default for FretBoard<'a> {
+impl<'a> Default for FretBoard {
     fn default() -> Self {
         Self {
             config: Config::default(),
@@ -136,7 +136,7 @@ impl Default for Config {
     }
 }
 
-impl<'a> FretBoard<'a> {
+impl FretBoard {
     pub fn ui_content(&mut self, ui: &mut Ui, _play_head: f32) -> egui::Response {
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());

@@ -12,7 +12,7 @@ egui = { version = "0.28.1", features = ["serde"] }
 egui_extras = "0.28.1"
 egui_plot = "0.28.1"
 env_logger = "0.11.5"
-lib = {path = "../guitarpro/lib/"}
+
 heapless = { version = "0.8.0", features = ["portable-atomic"] }
 # log = { version = "0.4.22", features = ["release_max_level_off"] }
 log = { version = "0.4.22" }
@@ -22,3 +22,5 @@ realfft = "3.3.0"
 ringbuf = "0.4.4"
 spectrum-analyzer = "1.5.0"
 splines = { version = "4.3.1" }
+lib = { git = "https://github.com/slundi/guitarpro" }
+# lib = {path = "../guitarpro/lib/"}

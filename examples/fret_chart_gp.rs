@@ -45,7 +45,7 @@ struct MyApp {
     start_instant: Instant,
 }
 
-impl<'a> MyApp {
+impl MyApp {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let args: Args = Args::parse();
         let mut song: gp::Song = gp::Song::default();
@@ -66,7 +66,7 @@ impl<'a> MyApp {
                 panic!("Invalid file extension (currently only .gp3, .gp4, .gp5 are supported)")
             }
         }
-        println!("Operned song {} by {}", song.name, song.artist);
+        println!("Opened song {} by {}", song.name, song.artist);
 
         for (i, track) in song.tracks.clone().into_iter().enumerate() {
             println!("[{}]: {}", i, track.name);
