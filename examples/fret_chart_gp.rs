@@ -99,7 +99,8 @@ impl<'a> MyApp {
         };
         println!("Tuning: {:?}", tuning.borrow().tuning());
         let mut fretnotes = vec![];
-        let mut current_time = 0.0;
+        //insert two measures of silence
+        let mut current_time = 2.0;
         /*let headers = song.measure_headers;
         let header_index = measure_1.header_index;
         let header = headers.get(header_index).unwrap();
@@ -110,7 +111,6 @@ impl<'a> MyApp {
             let voice = measure.voices.get(0).unwrap();
             for beat in &voice.beats {
                 for note in &beat.notes {
-                    current_time += beat.duration.value as f64 / 8.0;
                     let fretnote = FretNote::new(
                         (note.string - 1) as u8, //zero indexed...
                         note.value as u8,
@@ -119,15 +119,17 @@ impl<'a> MyApp {
                         tuning.clone(),
                     );
                     fretnotes.push(fretnote);
+                    current_time += 1.0 / beat.duration.value as f64;
+                    println!("Duration: {}", beat.duration.value as f64);
                 }
             }
         }
-        for n in fretnotes.clone() {
+        /*for n in fretnotes.clone() {
             println!(
                 "String:{}, Fret: {}, Start time: {}",
                 n.string, n.fret, n.start
             );
-        }
+        }*/
         let fretnotes = FretNotes(fretnotes);
         Self {
             fret_board: FretBoard::new(fretnotes),
@@ -295,7 +297,7 @@ impl FretBoard {
                     Color32::WHITE,
                 );
             } else {
-                painter.circle(c, string_space / 2.0, Color32::LIGHT_RED, note_stroke);
+                painter.circle(c, string_space / 4.0, Color32::LIGHT_RED, note_stroke);
                 painter.text(
                     c,
                     Align2::CENTER_CENTER,
