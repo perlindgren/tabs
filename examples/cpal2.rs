@@ -1,5 +1,4 @@
 use cpal::{traits::*, *};
-use egui_plot::HLine;
 use heapless::spsc::*;
 
 use egui::*;
@@ -8,6 +7,9 @@ use log::*;
 const QUEUE_SIZE: usize = 1024; // in f32
 type Q = Queue<f32, { QUEUE_SIZE * 2 }>;
 type C = Consumer<'static, f32, { QUEUE_SIZE * 2 }>;
+
+// const FS: usize = 48_000; // assume 48kHz sample rate
+const FS: usize = 48_000; // assume 48kHz sample rate
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -26,8 +28,8 @@ fn main() -> Result<(), eframe::Error> {
 
     let config = cpal::StreamConfig {
         channels: 1,
-        sample_rate: SampleRate(48000),
-        buffer_size: BufferSize::Fixed(256 as u32), // in bytes
+        sample_rate: SampleRate(FS as u32),
+        buffer_size: BufferSize::Fixed(64 * 4), // 64 samples
     };
 
     let spsc: &'static mut Q = {
@@ -71,96 +73,137 @@ fn main() -> Result<(), eframe::Error> {
 }
 
 use realfft::{num_complex::Complex, RealFftPlanner, RealToComplex};
-use std::f32::consts::PI;
 use std::sync::Arc;
 
-const FS: usize = 48_000; // assume 48kHz sample rate
 struct MyApp {
     consumer: C,
     in_data: [f32; FS],
     ptr: usize, // pointer in data
-    fft_in_data: [f32; FS],
-    spectrum: [Complex<f32>; FS / 2 + 1],
     r2c: Arc<dyn RealToComplex<f32>>,
     fft: Fft,
 }
+
+const NR_FFTS: usize = 2;
 
 impl MyApp {
     fn new(_cc: &eframe::CreationContext<'_>, consumer: C) -> Self {
         // make a planner
         let mut real_planner = RealFftPlanner::<f32>::new();
 
-        // create a FFT
+        // let mut r2cs = vec![];
+
+        // for i in 0..NR_FFTS {
+        //     let fft_size = FS as u32 / 2u32.pow(i as u32);
+        //     // create a FFT
+        //     r2cs.push(real_planner.plan_fft_forward(fft_size as usize));
+        // }
+
         let r2c = real_planner.plan_fft_forward(FS);
 
         Self {
             consumer,
             in_data: [0.0; FS],
             ptr: 0,
-            fft_in_data: [0.0; FS],
-            spectrum: [0.0.into(); FS / 2 + 1],
             r2c,
             fft: Fft::default(),
         }
     }
 }
 
+// in_data     [0,1, .., ptr, ..., FS-1]
+//                 newest | oldest ...
+// fft_in_data [oldest           newest]
+
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             while let Some(s) = self.consumer.dequeue() {
-                self.in_data[self.ptr] = s;
-                self.ptr = (self.ptr + 1) % FS;
+                self.in_data[self.ptr] = s; // most resent sample
+                self.ptr = (self.ptr + 1) % FS; // next
             }
 
             ui.label(format!("ptr {}", self.ptr));
 
-            self.fft_in_data[..self.ptr].copy_from_slice(&self.in_data[FS - self.ptr..]);
-            self.fft_in_data[self.ptr..].copy_from_slice(&self.in_data[..FS - self.ptr]);
+            let mut spectrums = vec![];
 
-            // self.fft_in_data[1024..].copy_from_slice(&[0.0; FS - 1024]);
+            let mut fft_in_data = self.r2c.make_input_vec();
+            let mut spectrum = self.r2c.make_output_vec();
 
-            self.r2c
-                .process(&mut self.fft_in_data, &mut self.spectrum)
-                .unwrap();
+            for r2c in 1..=NR_FFTS {
+                // make a dummy real-valued signal (filled with zeros)
 
-            self.fft.ui_content(ui, &self.spectrum);
+                // make a vector for storing the spectrum
+
+                fft_in_data[r2c.len() - self.ptr..].copy_from_slice(&self.in_data[..self.ptr]);
+                fft_in_data[..r2c.len() - self.ptr].copy_from_slice(&self.in_data[self.ptr..]);
+
+                // most recent sample
+                assert_eq!(
+                    self.in_data[(FS + self.ptr - 1) % FS],
+                    *fft_in_data.last().unwrap()
+                );
+                // oldest sample
+                assert_eq!(self.in_data[self.ptr], *fft_in_data.first().unwrap());
+
+                // // TODO: apply some window function
+                r2c.process(&mut fft_in_data, &mut spectrum).unwrap();
+                spectrums.push(spectrum);
+            }
+
+            self.fft.ui_content(ui, spectrums);
 
             ctx.request_repaint();
         });
     }
 }
 
-#[derive(Default)]
-struct Fft {}
+struct Fft {
+    // old_norm: [f32; FS / 2 + 1],
+}
+
+impl Default for Fft {
+    fn default() -> Self {
+        Fft {
+            // old_norm: [0.0; FS / 2 + 1],
+        }
+    }
+}
 
 impl Fft {
-    pub fn ui_content(&mut self, ui: &mut Ui, fft_data: &[Complex<f32>]) -> egui::Response {
-        let size = ui.available_size();
+    pub fn ui_content(&mut self, ui: &mut Ui, spectrums: Vec<Vec<Complex<f32>>>) -> egui::Response {
+        // ui.label(format!("max {:?}", self.max));
+
+        let mut size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
         let rect = response.rect;
         trace!("rect {:?}", rect);
 
-        let fft_stroke = Stroke::new(1.0, Color32::from_gray(255));
+        let fft_strokes = [
+            Stroke::new(1.0, Color32::from_gray(255)),
+            Stroke::new(1.0, Color32::YELLOW),
+        ];
+        for spectrum in spectrums {
+            // size.x = size.x.max(fft_data.len() as f32);
 
-        let mut max = 0.0;
-        for i in 0..rect.width() as usize {
-            if fft_data[i].norm() > max {
-                max = fft_data[i].norm()
+            // draw spectrum
+            for (i, bin) in spectrum.iter().take(rect.width() as usize).enumerate() {
+                painter.vline(
+                    i as f32 + rect.left(),
+                    Rangef::new(
+                        rect.top()
+                            + rect.height() * (1.0 - bin.norm() / (spectrum.len() as f32).sqrt()),
+                        rect.bottom(),
+                    ),
+                    fft_strokes[i],
+                );
             }
         }
 
-        // draw spectrum
-        for i in 0..rect.width() as usize {
-            painter.vline(
-                i as f32 + rect.left(),
-                Rangef::new(
-                    rect.top() + rect.height() * (1.0 - fft_data[i].norm() / max),
-                    rect.bottom(),
-                ),
-                fft_stroke,
-            );
-        }
+        // painter.vline(
+        //     82.0 + rect.left(), // our E bin
+        //     Rangef::new(rect.top(), rect.height() / 2.0),
+        //     fft_stroke,
+        // );
 
         // painter.debug_rect(rect, Color32::RED, "here");
         response

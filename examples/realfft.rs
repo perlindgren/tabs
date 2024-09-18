@@ -30,24 +30,18 @@ fn main() {
     // create a FFT
     let r2c = real_planner.plan_fft_forward(FS);
     // make input and output vectors
-    let mut indata = r2c.make_input_vec();
-
-    // for (i, d) in indata.iter_mut().enumerate() {
-    //     *d = ((41.2 * 2.0 * PI * i as f32 + 0.4 * PI) / (length as f32)).sin() * 0.5
-    //         + ((43.7 * 2.0 * PI * i as f32) / (length as f32)).sin() * 0.5;
-    // }
+    let mut in_data = r2c.make_input_vec();
     let mut spectrum = r2c.make_output_vec();
 
     // Are they the length we expect?
-    // assert_eq!(indata.len(), length);
+    assert_eq!(in_data.len(), length);
     assert_eq!(spectrum.len(), length / 2 + 1);
 
     // Forward transform the input data
-    // r2c.process(&mut indata, &mut spectrum).unwrap();
     let i = std::time::Instant::now();
     for _ in 0..1000 {
-        indata = data.to_vec();
-        r2c.process(&mut indata, &mut spectrum).unwrap();
+        in_data = data.to_vec();
+        r2c.process(&mut in_data, &mut spectrum).unwrap();
     }
     let d = std::time::Instant::now() - i;
     println!("d {:?}", d);

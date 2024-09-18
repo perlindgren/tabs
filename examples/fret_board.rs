@@ -2,10 +2,7 @@
 
 use eframe::egui;
 use egui::Stroke;
-use std::{
-    // marker::PhantomData,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use egui::*;
 use log::*;
@@ -153,10 +150,7 @@ impl<'a> FretBoard<'a> {
         for i in 0..self.nr_frets {
             let y = string_space * (0.5 + i as f32) + rect.top();
             trace!("i {}, y {}", i, y);
-            painter.line_segment(
-                [(rect.left(), y).into(), (rect.right(), y).into()],
-                fret_stroke,
-            );
+            painter.hline(Rangef::new(rect.left(), rect.right()), y, fret_stroke);
         }
 
         // draw frets,
