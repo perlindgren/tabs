@@ -20,4 +20,5 @@ num_enum = "0.7.3"
 rand = "0.8.5"
 realfft = "3.3.0"
 ringbuf = "0.4.4"
+spectrum-analyzer = "1.5.0"
 splines = { version = "4.3.1" }
