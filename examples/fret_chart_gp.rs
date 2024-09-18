@@ -1,16 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
 use eframe::egui;
-use egui::Stroke;
+
 use std::{
     cell::RefCell,
     rc::Rc,
-    sync::Arc,
     time::{Duration, Instant},
 };
 
 use clap::Parser;
-use egui::*;
+
 use log::*;
 use scorelib::gp;
 use std::{fs, io::Read, path::Path};
@@ -98,41 +97,34 @@ impl MyApp {
             panic!("Unsupported tuning")
         };
         println!("Tuning: {:?}", tuning.borrow().tuning());
-        let mut fretnotes = vec![];
+        let mut fret_notes = vec![];
+
         //insert two measures of silence
         let mut current_time = 2.0;
-        /*let headers = song.measure_headers;
-        let header_index = measure_1.header_index;
-        let header = headers.get(header_index).unwrap();
-        let tempo = header.tempo;*/
+
         let tempo = song.tempo;
         println!("tempo {}", tempo);
         for measure in &track.measures {
-            let voice = measure.voices.get(0).unwrap();
+            let voice = measure.voices.first().unwrap();
             for beat in &voice.beats {
                 for note in &beat.notes {
-                    let fretnote = FretNote::new(
+                    let fret_note = FretNote::new(
                         (note.string - 1) as u8, //zero indexed...
                         note.value as u8,
                         current_time as f32,
                         None,
                         tuning.clone(),
                     );
-                    fretnotes.push(fretnote);
+                    fret_notes.push(fret_note);
                     current_time += 1.0 / beat.duration.value as f64;
                     println!("Duration: {}", beat.duration.value as f64);
                 }
             }
         }
-        /*for n in fretnotes.clone() {
-            println!(
-                "String:{}, Fret: {}, Start time: {}",
-                n.string, n.fret, n.start
-            );
-        }*/
-        let fretnotes = FretNotes(fretnotes);
+
+        let fret_notes = FretNotes(fret_notes);
         Self {
-            fret_board: FretChart::new(fretnotes),
+            fret_board: FretChart::new(fret_notes),
             looping: false,
             time_instant: Instant::now(),
             bpm: tempo as f32,
@@ -156,10 +148,6 @@ impl eframe::App for MyApp {
             let f = (one_sec.as_micros() / since.as_micros()) as u32;
 
             ui.label(format!("Freq: {:?}", f));
-
-            // if f < 59 || f > 61 {
-            //     debug!("frame-rate {}", f);
-            // }
 
             ui.label(format!("Transport: {:?}", transport));
             ui.label(format!("Beat {}, Pos {}", 1 + beat as u32 % 4, beat as u32));
@@ -189,23 +177,6 @@ fn get_input() -> usize {
     let s = s.strip_suffix("\n").unwrap();
     s.parse::<usize>().unwrap()
 }
+
 #[cfg(test)]
-mod test {
-    // use crate::FretBoard;
-
-    // #[test]
-    // fn test_beat_to_pos() {
-    //     let fb = FretBoard::default();
-
-    //     let r = fb.beat_to_pos(2.0, 1.0);
-    //     println!("r {}", r);
-    // }
-
-    #[test]
-    fn fmod() {
-        let range = 2.0;
-        for i in 0..20 {
-            println!("{}", range + (i as f32 * 1.05) % range);
-        }
-    }
-}
+mod test {}
