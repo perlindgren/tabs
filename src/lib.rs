@@ -2,6 +2,7 @@ use core::marker::PhantomData;
 use std::{cell::RefCell, fmt::Debug, rc::Rc, sync::Arc};
 mod note;
 pub use note::*;
+pub mod spectrum_view;
 
 pub trait Tuning {
     fn tuning(&self) -> &'static [Note];

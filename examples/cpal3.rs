@@ -9,6 +9,7 @@ use spectrum_analyzer::{
 
 use egui::*;
 use log::*;
+use tabs::spectrum_view::SpectrumView;
 
 const QUEUE_SIZE: usize = 1024; // in f32
 type Q = Queue<f32, { QUEUE_SIZE * 2 }>;
@@ -78,17 +79,12 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
-use realfft::{num_complex::Complex, RealFftPlanner, RealToComplex};
-use std::sync::Arc;
-
 struct MyApp {
     consumer: C,
     in_data: [f32; FS],
     ptr: usize, // pointer in data
-    fft: Fft,
+    fft: SpectrumView,
 }
-
-const NR_FFTS: usize = 2;
 
 impl MyApp {
     fn new(_cc: &eframe::CreationContext<'_>, consumer: C) -> Self {
@@ -96,7 +92,7 @@ impl MyApp {
             consumer,
             in_data: [0.0; FS],
             ptr: 0,
-            fft: Fft::default(),
+            fft: SpectrumView::default(),
         }
     }
 }
@@ -147,73 +143,12 @@ impl eframe::App for MyApp {
                     Some(&divide_by_N),
                 )
                 .unwrap();
-                spectrums.push(Box::new(spectrum))
+                spectrums.push(spectrum)
             }
 
             self.fft.ui_content(ui, spectrums);
 
             ctx.request_repaint();
         });
-    }
-}
-
-struct Fft {
-    // old_norm: [f32; FS / 2 + 1],
-}
-
-impl Default for Fft {
-    fn default() -> Self {
-        Fft {
-            // old_norm: [0.0; FS / 2 + 1],
-        }
-    }
-}
-
-impl Fft {
-    pub fn ui_content(
-        &mut self,
-        ui: &mut Ui,
-        spectrums: Vec<Box<FrequencySpectrum>>,
-    ) -> egui::Response {
-        // ui.label(format!("max {:?}", self.max));
-
-        let mut size = ui.available_size();
-        let (response, painter) = ui.allocate_painter(size, Sense::hover());
-        let rect = response.rect;
-        trace!("rect {:?}", rect);
-
-        let fft_strokes = [
-            Stroke::new(1.0, Color32::WHITE),
-            Stroke::new(1.0, Color32::YELLOW),
-            Stroke::new(1.0, Color32::GREEN),
-            Stroke::new(1.0, Color32::BLUE),
-        ];
-
-        // for (f, v) in spectrum.data().iter().take(20) {
-        //     print!("{}, ", f.val())
-        // }
-        // println!();
-
-        for (i, s) in spectrums.iter().rev().enumerate() {
-            // draw spectrum
-            for (f, v) in s.data().iter() {
-                let x: f32 = f.val();
-                let v: f32 = v.val() * 50.0;
-                painter.vline(
-                    x + rect.left(),
-                    Rangef::new(rect.top() + rect.height() * (1.0 - v), rect.bottom()),
-                    fft_strokes[i],
-                );
-            }
-        }
-
-        // painter.vline(
-        //     82.0 + rect.left(), // our E bin
-        //     Rangef::new(rect.top(), rect.height() / 2.0),
-        //     fft_stroke,
-        // );
-
-        // painter.debug_rect(rect, Color32::RED, "here");
-        response
     }
 }
