@@ -85,7 +85,6 @@ struct MyApp {
     consumer: C,
     in_data: [f32; FS],
     ptr: usize, // pointer in data
-    r2c: Arc<dyn RealToComplex<f32>>,
     fft: Fft,
 }
 
@@ -93,15 +92,10 @@ const NR_FFTS: usize = 2;
 
 impl MyApp {
     fn new(_cc: &eframe::CreationContext<'_>, consumer: C) -> Self {
-        // make a planner
-        let mut real_planner = RealFftPlanner::<f32>::new();
-        let r2c = real_planner.plan_fft_forward(FS);
-
         Self {
             consumer,
             in_data: [0.0; FS],
             ptr: 0,
-            r2c,
             fft: Fft::default(),
         }
     }
@@ -124,10 +118,10 @@ impl eframe::App for MyApp {
             ui.label(format!("ptr {}", self.ptr));
 
             // create
-            let mut fft_in_data = self.r2c.make_input_vec();
+            let mut fft_in_data = [0.0; FS];
 
-            fft_in_data[self.r2c.len() - self.ptr..].copy_from_slice(&self.in_data[..self.ptr]);
-            fft_in_data[..self.r2c.len() - self.ptr].copy_from_slice(&self.in_data[self.ptr..]);
+            fft_in_data[FS - self.ptr..].copy_from_slice(&self.in_data[..self.ptr]);
+            fft_in_data[..FS - self.ptr].copy_from_slice(&self.in_data[self.ptr..]);
 
             // most recent sample
             assert_eq!(

@@ -12,6 +12,7 @@
     "realfft",
     "repr",
     "ringbuf",
+    "scorelib",
     "spsc",
     "vline",
     "vsync"

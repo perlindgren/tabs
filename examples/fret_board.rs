@@ -92,7 +92,7 @@ struct FretBoard {
                       // _marker: PhantomData<T>,
 }
 
-impl<'a> Default for FretBoard {
+impl Default for FretBoard {
     fn default() -> Self {
         Self {
             config: Config::default(),
