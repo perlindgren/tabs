@@ -22,24 +22,21 @@ fn main() -> Result<(), eframe::Error> {
         "Fret Test",
         options,
         Box::new(|cc| {
-            let app: MyApp<EADGBE> = MyApp::new(cc);
+            let app: MyApp = MyApp::new(cc);
             Ok(Box::new(app))
         }),
     )
 }
 
-struct MyApp<T>
-where
-    T: Tuning,
-{
-    fret_board: FretBoard<T>,
+struct MyApp<'a> {
+    fret_board: FretBoard<'a>,
     looping: bool,
     time_instant: Instant,
     bpm: f32,
     start_instant: Instant,
 }
 
-impl MyApp<EADGBE> {
+impl<'a> MyApp<'a> {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         Self {
             fret_board: FretBoard::default(),
@@ -51,10 +48,7 @@ impl MyApp<EADGBE> {
     }
 }
 
-impl<T> eframe::App for MyApp<T>
-where
-    T: Tuning,
-{
+impl<'a> eframe::App for MyApp<'a> {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let now = Instant::now();
@@ -91,23 +85,20 @@ where
     }
 }
 
-struct FretBoard<T>
-where
-    T: Tuning,
-{
+struct FretBoard<'a> {
     config: Config,
     nr_frets: u8,
-    notes: FretNotes<T>, // perhaps we should use some btree for sorted data structure
-                         // _marker: PhantomData<T>,
+    notes: FretNotes<'a>, // perhaps we should use some btree for sorted data structure
+                          // _marker: PhantomData<T>,
 }
 
-impl Default for FretBoard<EADGBE> {
+impl<'a> Default for FretBoard<'a> {
     fn default() -> Self {
         Self {
             config: Config::default(),
             nr_frets: 6,
             // notes: Notes(vec![]), // Notes<N, T>::default(),
-            notes: FretNotes::default(),
+            notes: FretNotes(vec![]),
         }
     }
 }
@@ -145,10 +136,7 @@ impl Default for Config {
     }
 }
 
-impl<T> FretBoard<T>
-where
-    T: Tuning,
-{
+impl<'a> FretBoard<'a> {
     pub fn ui_content(&mut self, ui: &mut Ui, _play_head: f32) -> egui::Response {
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
