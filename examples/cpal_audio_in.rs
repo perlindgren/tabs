@@ -3,11 +3,8 @@ use heapless::spsc::*;
 
 use spectrum_analyzer::scaling::divide_by_N;
 use spectrum_analyzer::windows::hann_window;
-use spectrum_analyzer::{
-    samples_fft_to_spectrum, FrequencyLimit, FrequencySpectrum, FrequencyValue,
-};
+use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 
-use egui::*;
 use log::*;
 use tabs::spectrum_view::SpectrumView;
 
@@ -41,7 +38,10 @@ fn main() -> Result<(), eframe::Error> {
 
     let spsc: &'static mut Q = {
         static mut SPSC: Q = Queue::new();
-        unsafe { &mut SPSC }
+        #[allow(static_mut_refs)]
+        unsafe {
+            &mut SPSC
+        }
     };
 
     let (mut producer, consumer) = spsc.split();
@@ -49,19 +49,16 @@ fn main() -> Result<(), eframe::Error> {
     let input_stream = device
         .build_input_stream(
             &config,
-            move |data: &[f32], info: &cpal::InputCallbackInfo| {
-                // react to stream events and read or write stream data here.
-                // println!("data len {}, info {:?}", data.len(), info);
-
+            move |data: &[f32], _info: &cpal::InputCallbackInfo| {
                 for &sample in data {
                     if producer.enqueue(sample).is_err() {
-                        println!("err");
+                        println!("spsc queue full");
                     }
                 }
             },
             move |err| {
                 // react to errors here.
-                println!("err {:?}", err)
+                println!("stream error {:?}", err)
             },
             None, // None=blocking, Some(Duration)=timeout
         )

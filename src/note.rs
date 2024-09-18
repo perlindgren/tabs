@@ -67,7 +67,7 @@ impl Sub for Note {
 }
 
 #[derive(Debug)]
-pub struct Hz(f32);
+pub struct Hz(pub f32);
 
 impl From<Note> for Hz {
     fn from(n: Note) -> Self {
@@ -112,7 +112,7 @@ impl From<MidiNote> for Note {
         let octave = ((id - id % 12) / 12) - 1;
 
         Note {
-            semi_tone: semitone.into(),
+            semi_tone: semitone,
             octave: octave as u8,
         }
     }

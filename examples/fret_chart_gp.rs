@@ -3,7 +3,6 @@
 use eframe::egui;
 
 use std::{
-    cell::RefCell,
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -89,14 +88,14 @@ impl MyApp {
         let eadg = EADG {};
         println!("{:?}", eadgbe.tuning());
         println!("{:?}", strings.as_slice());
-        let tuning: Rc<RefCell<dyn Tuning>> = if strings.as_slice() == eadgbe.tuning() {
-            Rc::new(RefCell::new(eadgbe))
+        let tuning: Rc<dyn Tuning> = if strings.as_slice() == eadgbe.tuning() {
+            Rc::new(eadgbe)
         } else if strings.as_slice() == eadg.tuning() {
-            Rc::new(RefCell::new(eadg))
+            Rc::new(eadg)
         } else {
             panic!("Unsupported tuning")
         };
-        println!("Tuning: {:?}", tuning.borrow().tuning());
+        println!("Tuning: {:?}", tuning.tuning());
         let mut fret_notes = vec![];
 
         //insert two measures of silence
