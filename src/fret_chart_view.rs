@@ -2,10 +2,22 @@ use crate::FretNotes;
 use egui::*;
 use log::*;
 
+#[derive(Debug)]
 pub struct FretChart {
     config: Config,
     nr_frets: u8,
     notes: FretNotes, // perhaps we should use some btree for sorted data structure
+}
+
+impl Default for FretChart {
+    fn default() -> Self {
+        Self {
+            config: Config::default(),
+            nr_frets: 6,
+
+            notes: FretNotes(vec![]),
+        }
+    }
 }
 
 #[derive(Debug)]
