@@ -15,7 +15,7 @@ type Q = Queue<f32, { QUEUE_SIZE * 2 }>;
 type C = Consumer<'static, f32, { QUEUE_SIZE * 2 }>;
 
 // const FS: usize = 48_000; // assume 48kHz sample rate
-const FS: usize = 48_000; // assume 48kHz sample rate
+const FS: usize = 2048 * 2; // assume 48kHz sample rate
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -50,7 +50,7 @@ fn main() -> Result<(), eframe::Error> {
             &config,
             move |data: &[f32], info: &cpal::InputCallbackInfo| {
                 // react to stream events and read or write stream data here.
-                println!("data len {}, info {:?}", data.len(), info);
+                // println!("data len {}, info {:?}", data.len(), info);
 
                 for &sample in data {
                     if producer.enqueue(sample).is_err() {
@@ -111,7 +111,7 @@ impl MyApp {
 //                 newest | oldest ...
 // fft_in_data [oldest           newest]
 
-const WINDOW: usize = 16384;
+const WINDOW: usize = FS;
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -125,11 +125,6 @@ impl eframe::App for MyApp {
 
             // create
             let mut fft_in_data = self.r2c.make_input_vec();
-            let mut spectrum = self.r2c.make_output_vec();
-
-            // make a dummy real-valued signal (filled with zeros)
-
-            // make a vector for storing the spectrum
 
             fft_in_data[self.r2c.len() - self.ptr..].copy_from_slice(&self.in_data[..self.ptr]);
             fft_in_data[..self.r2c.len() - self.ptr].copy_from_slice(&self.in_data[self.ptr..]);
@@ -142,20 +137,26 @@ impl eframe::App for MyApp {
             // oldest sample
             assert_eq!(self.in_data[self.ptr], *fft_in_data.first().unwrap());
 
-            // spectrum analysis only of the latest WINDOW
-            let relevant_samples = &fft_in_data[fft_in_data.len() - WINDOW..];
+            let mut spectrums = vec![];
 
-            // do FFT
-            let hann_window = hann_window(relevant_samples);
-            let spectrum = samples_fft_to_spectrum(
-                &hann_window,
-                FS as u32,
-                FrequencyLimit::Max(2000.0),
-                Some(&divide_by_N),
-            )
-            .unwrap();
+            for i in 0..4 {
+                // spectrum analysis only of the latest WINDOW
+                let relevant_samples = &fft_in_data[fft_in_data.len() - WINDOW / 2usize.pow(i)..];
 
-            self.fft.ui_content(ui, spectrum);
+                // do FFT
+                let hann_window = hann_window(relevant_samples);
+                let spectrum = samples_fft_to_spectrum(
+                    &hann_window,
+                    FS as u32,
+                    FrequencyLimit::All, //
+                    // FrequencyLimit::Max(2000.0),
+                    Some(&divide_by_N),
+                )
+                .unwrap();
+                spectrums.push(Box::new(spectrum))
+            }
+
+            self.fft.ui_content(ui, spectrums);
 
             ctx.request_repaint();
         });
@@ -175,7 +176,11 @@ impl Default for Fft {
 }
 
 impl Fft {
-    pub fn ui_content(&mut self, ui: &mut Ui, spectrum: FrequencySpectrum) -> egui::Response {
+    pub fn ui_content(
+        &mut self,
+        ui: &mut Ui,
+        spectrums: Vec<Box<FrequencySpectrum>>,
+    ) -> egui::Response {
         // ui.label(format!("max {:?}", self.max));
 
         let mut size = ui.available_size();
@@ -183,19 +188,29 @@ impl Fft {
         let rect = response.rect;
         trace!("rect {:?}", rect);
 
-        let fft_stroke = Stroke::new(1.0, Color32::from_gray(255));
+        let fft_strokes = [
+            Stroke::new(1.0, Color32::WHITE),
+            Stroke::new(1.0, Color32::YELLOW),
+            Stroke::new(1.0, Color32::GREEN),
+            Stroke::new(1.0, Color32::BLUE),
+        ];
 
-        // size.x = size.x.max(fft_data.len() as f32);
+        // for (f, v) in spectrum.data().iter().take(20) {
+        //     print!("{}, ", f.val())
+        // }
+        // println!();
 
-        // draw spectrum
-        for (f, v) in spectrum.data().iter() {
-            let x: f32 = f.val();
-            let v: f32 = v.val() * 250.0;
-            painter.vline(
-                x + rect.left(),
-                Rangef::new(rect.top() + rect.height() * (1.0 - v), rect.bottom()),
-                fft_stroke,
-            );
+        for (i, s) in spectrums.iter().rev().enumerate() {
+            // draw spectrum
+            for (f, v) in s.data().iter() {
+                let x: f32 = f.val();
+                let v: f32 = v.val() * 50.0;
+                painter.vline(
+                    x + rect.left(),
+                    Rangef::new(rect.top() + rect.height() * (1.0 - v), rect.bottom()),
+                    fft_strokes[i],
+                );
+            }
         }
 
         // painter.vline(
