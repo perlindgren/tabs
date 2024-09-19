@@ -4,7 +4,7 @@ use eframe::egui;
 use std::time::{Duration, Instant};
 
 use log::*;
-use tabs::fret_chart_view::*;
+use tabs::fret_chart::*;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).

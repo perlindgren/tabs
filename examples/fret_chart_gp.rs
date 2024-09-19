@@ -12,7 +12,7 @@ use clap::Parser;
 use log::*;
 use scorelib::gp;
 use std::{fs, io::Read, path::Path};
-use tabs::{fret_chart_view::*, *};
+use tabs::{fret_chart::*, *};
 
 #[derive(Parser, Debug)]
 struct Args {

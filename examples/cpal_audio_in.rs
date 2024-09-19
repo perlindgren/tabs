@@ -6,7 +6,7 @@ use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 
 use log::*;
-use tabs::spectrum_view::SpectrumView;
+use tabs::spectrum::SpectrumView;
 
 const QUEUE_SIZE: usize = 1024; // in f32
 type Q = Queue<f32, { QUEUE_SIZE * 2 }>;
