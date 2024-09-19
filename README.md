@@ -11,8 +11,10 @@ Early experiment to explore:
 ## Key technologies used
 
 - `egui`
-- `realfft`
+- `spectrum-analyzer`
 - `cpal`
+- `rodio`
+- `guitarpro`
 
 ## So far so good...
 
@@ -21,6 +23,25 @@ Early experiment to explore:
 - Initial layout of fret chart (tab view), with left <- right scrolling of notes.
 - Initial fft support
 - Real time audio capture + fft + egui
+- Initial support for converting between Guitar Pro format (`.gp3`, `.gp4`, `.gp5`) tabulature and the internal representation of a song chart using (`guitarpro`)[https://github.com/slundi/guitarpro]
+
+## Examples
+
+### `audio_playback`
+Super simple proof of concept for audio file playback using `rodio`. Supports `.mp3`, `.flac`, `.wav` formats. A file can be provided using the `--path` flag, which defaults to the bundled (Landskap)[] song `A Nameless Fool` in an `.mp3` format.
+
+### `cpal_audio_in`
+Graphical spectrum analyzer as an example of on-line FFT. Uses the default input sound device.
+
+### `fret_board`
+Rendering example of a guitar fretboard.
+
+### `fret_chart`
+Rendering example of a `chart` (notes over time). The default implementation of `FretChart` is devoid of notes, this example reflects that and can serve as a scaffolding.
+
+### `fret_chart_gp`
+Extension of the `fret_chart` example, populates the `FretChart` with notes parsed from a Guitar Pro format tabulature file passed through the `--path` flag.
+
 
 ## Some notes on pitch detection
 
