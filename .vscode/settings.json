@@ -13,6 +13,7 @@
     "realfft",
     "repr",
     "ringbuf",
+    "rodio",
     "scorelib",
     "spsc",
     "vline",
