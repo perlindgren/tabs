@@ -2,8 +2,7 @@
 use num::Complex;
 use std::f32::consts::PI;
 
-pub fn gen_filter(fs: usize, f_expected: f32) -> Vec<Complex<f32>> {
-    let p: u8 = 40; // number of periods
+pub fn gen_filter(fs: usize, f_expected: f32, p: u8) -> Vec<Complex<f32>> {
     let ws = (p as f32 * fs as f32 / f_expected) as i32; //window size
     let w = -ws / 2..=ws / 2; // inclusive range
 
@@ -39,8 +38,6 @@ pub fn gen_filter(fs: usize, f_expected: f32) -> Vec<Complex<f32>> {
 
     // hanning weighted sin_cos window
     let sin_cos_hann: Vec<_> = sin_cos.iter().zip(hann).map(|(c, h)| h * c).collect();
-
-    println!("sin_cos_hann {}", sin_cos_hann.first().unwrap());
 
     sin_cos_hann
 }
