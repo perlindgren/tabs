@@ -2,6 +2,7 @@
   "cSpell.ignoreWords": [
     "EADG",
     "EADGBE",
+    "Hanning",
     "Rangef",
     "consts",
     "eframe",
@@ -14,6 +15,7 @@
     "repr",
     "ringbuf",
     "rodio",
+    "schk",
     "scorelib",
     "spsc",
     "vline",
