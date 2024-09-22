@@ -5,6 +5,7 @@
     "Hanning",
     "Rangef",
     "consts",
+    "conv",
     "eframe",
     "egui",
     "hann",

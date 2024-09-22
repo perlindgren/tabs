@@ -1,6 +1,7 @@
 use std::{fmt::Debug, rc::Rc};
 mod note;
 pub use note::*;
+pub mod dsp;
 pub mod fret_chart;
 pub mod spectrum;
 
