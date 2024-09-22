@@ -37,9 +37,9 @@ Never the less, for instruments of interest (guitars/basses) and harmonics for e
 
 The file `freq_match.m` provides a proof of concept implementation, showing the feasibility of the approach.
 
-The hardest detection problem occurs for the lowest notes, in this case E2 at 82.41 Hz (low E on a 6-string guitar in normal tuning), `f_schk` in code.
+The hardest detection problem occurs for the lowest notes, in this case E2 at 82.41 Hz (low E on a 6-string guitar in normal tuning), `f_expected` in code.
 
-We create a matching filter with the number of periods `p = 40` (adjustable). The `sin_cos` filter has a maxima for the expected frequency (`f_sch`). To reduce artifacts, a Hanning window (`p` periods) is applied.
+We create a matching filter with the number of periods `p = 40` (adjustable). The `sin_cos` filter has a maxima for the expected frequency (`f_expected`). To reduce artifacts, a Hanning window (`p` periods) is applied.
 
 The matching factor is computed by convolving the input signal with the filter.
 
@@ -47,25 +47,31 @@ As an evaluation `data` represents the perfect match, and `data2` the closest mi
 
 For a period size `p = 40`, the spectral leakage is in worst case less than 20% between the two closest notes playable. For the steady state we have a leakage of less than 20%.
 
-The latency is related to filter window (adjustable by `p`), `ws = round(p * fs / f_sch)`, where `fs` is the sample rate. For this case the steady state latency is 0.5 second, which is fine for validation but will be insufficient to give prompt/real-time feedback.
+The latency is related to filter window (adjustable by `p`), `ws = round(p * fs / f_expected)`, where `fs` is the sample rate. For this case the steady state latency is 0.5 second, which is fine for validation but will be insufficient to give prompt/real-time feedback.
 
-We can repeat the experiment with `f_ot = 5` (the 6th harmonic). This gives a steady state output with a latency of less than 0.1 second. Thus we can mark the note as likely correctly played much earlier.
+We can repeat the experiment with `harmonic = 5` (the 6th harmonic). This gives a steady state output with a latency of less than 0.1 second. Thus we can mark the note as likely correctly played much earlier.
 
 To further improve latency, for the candidate selection we could also consider more aggressive period settings, just to check IF there is energy present at all in a lenient fashion. With a period `p = 10`, we get a steady state latency of 0.025s, and if we consider the worst case (regarding spectral leaking) we can determine a preliminary result after 0.012 ms. This is extraordinary, as it meets the criteria of optimal rendering latency for screens running at up to 80 Hz. Notice at these low latencies other parameters such as audio card internal buffering, operating system drivers and such will put limitations. In context of pro-audio setups with small audio buffer sizes enables end-to-end latency well below 10 ms, witch will meet our requirements.
 
+## Usage
 
+From terminal:
 
+```shell
+cd octave
+octave --gui
+```
 
+Open/edit the `freq_match.m` file to set `harmonic` and `f_expected`, save and run the script.
 
+```shell
+freq_match
+```
 
+There will be 4 Figures, where Figure 4 depicts the most interesting result, namely the normalized matching graphs, comparing perfect match to next neighboring note.
 
+## Disclaimer
 
+The evaluation is purely theoretical, realistic signals will contain noise and hum. The former due to noise characteristics will be a-periodic, thus likely not of any concern. Hum, on the other hand, is typically periodic and might introduce harmonics in the frequency range of interest. If posing a problem, some sort of mitigation may be required. Due to periodicity it may be possible to detect and cancel steady state hum harmonics.
 
-
-
-
-
-
-
-
-
+The actual detection algorithm has not yet been implemented. A reasonable next step is to re-implement the matching filter in Rust and validate its performance on synthesized signals. After that experiments on streaming audio and tuning of parameters can be conducted with the benefits of a real programming language.
