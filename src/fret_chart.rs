@@ -6,7 +6,9 @@ use log::*;
 pub struct FretChart {
     config: Config,
     nr_frets: u8,
-    notes: FretNotes, // perhaps we should use some btree for sorted data structure
+    pub notes: FretNotes,
+    // perhaps we should use some btree for sorted data structure
+    // this would be very useful for the lookup we have to do.
 }
 
 impl Default for FretChart {
