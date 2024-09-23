@@ -9,10 +9,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-const QUEUE_SIZE: usize = 8;
-type Q = Queue<u8, QUEUE_SIZE>;
+struct Packet(u8, Duration);
 
-type P = Producer<'static, u8, QUEUE_SIZE>;
+const QUEUE_SIZE: usize = 8;
+type Q = Queue<Packet, QUEUE_SIZE>;
+
+type P = Producer<'static, Packet, QUEUE_SIZE>;
 
 use log::*;
 use scorelib::gp;
@@ -174,15 +176,16 @@ impl MyApp {
                 }
                 match rx.dequeue() {
                     Some(b) => {
-                        if b == 1 {
+                        if b.0 == 1 {
                             if !paused {
                                 paused = true;
                                 playback.pause()
                             }
                         }
-                        if b == 0 {
+                        if b.0 == 0 {
                             if paused {
                                 paused = false;
+                                playback.try_seek(b.1).ok();
                                 playback.play()
                             }
                         }
@@ -216,7 +219,7 @@ impl eframe::App for MyApp {
             let transport = now - (self.start_instant + self.paused_time);
             if !self.playing_audio {
                 //start playback
-                self.tx.enqueue(0).ok();
+                self.tx.enqueue(Packet(0, transport)).ok();
                 self.playing_audio = true;
             }
             let f = (one_sec.as_micros() / since.as_micros()) as u32;
@@ -239,9 +242,10 @@ impl eframe::App for MyApp {
             if self.paused {
                 // Note detection to be done here
                 // for this PoC, spacebar unpauses playback
+                // we should also maybe send the time to the playback thread so time is adjusted
                 ui.input(|i| {
                     if i.key_pressed(egui::Key::Space) {
-                        self.tx.enqueue(0).ok();
+                        self.tx.enqueue(Packet(0, transport)).ok();
                         self.paused = false;
                     }
                 });
@@ -261,7 +265,7 @@ impl eframe::App for MyApp {
                         self.paused = true;
                         self.last_paused = Instant::now();
                         //pause audio thread
-                        self.tx.enqueue(1).ok();
+                        self.tx.enqueue(Packet(1, transport)).ok();
                     }
                 }
             }
