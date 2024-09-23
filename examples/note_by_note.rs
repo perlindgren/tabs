@@ -64,6 +64,7 @@ struct MyApp {
     paused: bool,
     last_paused: Instant,
     paused_time: Duration,
+    note_by_note: bool,
     beat: f32,
     tx: P,
 }
@@ -205,6 +206,7 @@ impl MyApp {
             paused: false,
             last_paused: Instant::now(),
             paused_time: Duration::from_secs(0),
+            note_by_note: false,
             beat: 0.0,
             tx,
         }
@@ -238,6 +240,16 @@ impl eframe::App for MyApp {
                 trace!("restart {:?}", ui.clip_rect());
                 self.start_instant = Instant::now();
             }
+            if ui
+                .button(format!("note by note: {}", self.note_by_note))
+                .clicked()
+            {
+                if self.note_by_note {
+                    self.note_by_note = false;
+                } else {
+                    self.note_by_note = true;
+                }
+            }
             self.time_instant = now;
             if self.paused {
                 // Note detection to be done here
@@ -253,19 +265,22 @@ impl eframe::App for MyApp {
             } else {
                 //4 beats per measure
                 self.beat = (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
-                let start_range = ((transport.as_micros() as f32 - since.as_micros() as f32)
-                    / 1000000.0)
-                    * (self.bpm / 4.0)
-                    / 60.0;
-                let end_range =
-                    (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
-                for n in &self.fret_board.notes.0 {
-                    //is there a note within the last frame?
-                    if (start_range..end_range).contains(&(n.start)) {
-                        self.paused = true;
-                        self.last_paused = Instant::now();
-                        //pause audio thread
-                        self.tx.enqueue(Packet(1, transport)).ok();
+                // if note by note is active, check if needs pause
+                if self.note_by_note {
+                    let start_range = ((transport.as_micros() as f32 - since.as_micros() as f32)
+                        / 1000000.0)
+                        * (self.bpm / 4.0)
+                        / 60.0;
+                    let end_range =
+                        (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
+                    for n in &self.fret_board.notes.0 {
+                        //is there a note within the last frame?
+                        if (start_range..end_range).contains(&(n.start)) {
+                            self.paused = true;
+                            self.last_paused = Instant::now();
+                            //pause audio thread
+                            self.tx.enqueue(Packet(1, transport)).ok();
+                        }
                     }
                 }
             }
