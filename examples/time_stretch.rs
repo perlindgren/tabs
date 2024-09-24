@@ -27,14 +27,14 @@ struct Args {
         short = 'p',
         long,
         help = "Input tab file path",
-        default_value = "metallica.gp3"
+        default_value = "amazing_grace.gp5"
     )]
     path: String,
     #[clap(
         short = 'a',
         long,
         help = "Input audio file path",
-        default_value = "landskap_a_nameless_fool.mp3"
+        default_value = "amazing_grace.mp3"
     )]
     audio_path: String,
 }
@@ -66,6 +66,8 @@ struct MyApp {
     paused_time: Duration,
     note_by_note: bool,
     beat: f32,
+    stretch_factor: f32,
+    transport: Duration,
     tx: P,
 }
 
@@ -208,6 +210,8 @@ impl MyApp {
             paused_time: Duration::from_secs(0),
             note_by_note: false,
             beat: 0.0,
+            stretch_factor: 1.0,
+            transport: Duration::from_secs_f32(0.0),
             tx,
         }
     }
@@ -218,15 +222,16 @@ impl eframe::App for MyApp {
             let now = Instant::now();
             let since = now - self.time_instant;
             let one_sec = Duration::from_secs(1);
-            let transport = now - (self.start_instant + self.paused_time);
+            //now - (self.start_instant + self.paused_time);
+            let bpm = self.bpm;
             if !self.playing_audio {
                 //start playback
-                self.tx.enqueue(Packet(0, transport)).ok();
+                self.tx.enqueue(Packet(0, self.transport)).ok();
                 self.playing_audio = true;
             }
             let f = (one_sec.as_micros() / since.as_micros()) as u32;
             ui.label(format!("Freq: {:?}", f));
-            ui.label(format!("Transport: {:?}", transport));
+            ui.label(format!("Transport: {:?}", self.transport));
             ui.label(format!(
                 "Beat {}, Pos {}",
                 1 + self.beat as u32 % 4,
@@ -236,6 +241,9 @@ impl eframe::App for MyApp {
             if ui.checkbox(&mut self.looping, "looping").clicked() {
                 trace!("something clicked, clip_rect {:?}", ui.clip_rect());
             }
+            ui.add(
+                egui::Slider::new(&mut self.stretch_factor, 0.0..=1.0).text("Time stretch factor"),
+            );
             if ui.button("restart").clicked() {
                 trace!("restart {:?}", ui.clip_rect());
                 self.start_instant = Instant::now();
@@ -257,29 +265,31 @@ impl eframe::App for MyApp {
                 // we should also maybe send the time to the playback thread so time is adjusted
                 ui.input(|i| {
                     if i.key_pressed(egui::Key::Space) {
-                        self.tx.enqueue(Packet(0, transport)).ok();
+                        self.tx.enqueue(Packet(0, self.transport)).ok();
                         self.paused = false;
                     }
                 });
-                self.paused_time += since;
+                self.paused_time += since.mul_f32(self.stretch_factor);
             } else {
+                self.transport += since.mul_f32(self.stretch_factor);
                 //4 beats per measure
-                self.beat = (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
+                self.beat = (self.transport.as_micros() as f32 / 1000000.0) * (bpm / 4.0) / 60.0;
                 // if note by note is active, check if needs pause
                 if self.note_by_note {
-                    let start_range = ((transport.as_micros() as f32 - since.as_micros() as f32)
+                    let start_range = ((self.transport.as_micros() as f32
+                        - (since.as_micros() as f32) * self.stretch_factor)
                         / 1000000.0)
-                        * (self.bpm / 4.0)
+                        * (bpm / 4.0)
                         / 60.0;
                     let end_range =
-                        (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
+                        (self.transport.as_micros() as f32 / 1000000.0) * (bpm / 4.0) / 60.0;
                     for n in &self.fret_board.notes.0 {
                         //is there a note within the last frame?
                         if (start_range..end_range).contains(&(n.start)) {
                             self.paused = true;
                             self.last_paused = Instant::now();
                             //pause audio thread
-                            self.tx.enqueue(Packet(1, transport)).ok();
+                            self.tx.enqueue(Packet(1, self.transport)).ok();
                         }
                     }
                 }
