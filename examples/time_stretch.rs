@@ -9,7 +9,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-struct Packet(u8, Duration);
+struct Packet(u8, Duration, f32);
 
 const QUEUE_SIZE: usize = 8;
 type Q = Queue<Packet, QUEUE_SIZE>;
@@ -188,10 +188,11 @@ impl MyApp {
                         if b.0 == 0 {
                             if paused {
                                 paused = false;
-                                playback.try_seek(b.1).ok();
+                                playback.try_seek(b.1.div_f32(b.2)).ok();
                                 playback.play()
                             }
                         }
+                        playback.set_speed(b.2);
                     }
                     None => {}
                 }
@@ -226,7 +227,9 @@ impl eframe::App for MyApp {
             let bpm = self.bpm;
             if !self.playing_audio {
                 //start playback
-                self.tx.enqueue(Packet(0, self.transport)).ok();
+                self.tx
+                    .enqueue(Packet(0, self.transport, self.stretch_factor))
+                    .ok();
                 self.playing_audio = true;
             }
             let f = (one_sec.as_micros() / since.as_micros()) as u32;
@@ -241,9 +244,21 @@ impl eframe::App for MyApp {
             if ui.checkbox(&mut self.looping, "looping").clicked() {
                 trace!("something clicked, clip_rect {:?}", ui.clip_rect());
             }
-            ui.add(
-                egui::Slider::new(&mut self.stretch_factor, 0.0..=1.0).text("Time stretch factor"),
-            );
+            if ui
+                .add(
+                    egui::Slider::new(&mut self.stretch_factor, 0.0..=1.0)
+                        .text("Time stretch factor"),
+                )
+                .changed()
+            {
+                self.tx
+                    .enqueue(Packet(
+                        if self.paused { 1 } else { 0 },
+                        self.transport,
+                        self.stretch_factor,
+                    ))
+                    .ok();
+            };
             if ui.button("restart").clicked() {
                 trace!("restart {:?}", ui.clip_rect());
                 self.start_instant = Instant::now();
@@ -265,7 +280,9 @@ impl eframe::App for MyApp {
                 // we should also maybe send the time to the playback thread so time is adjusted
                 ui.input(|i| {
                     if i.key_pressed(egui::Key::Space) {
-                        self.tx.enqueue(Packet(0, self.transport)).ok();
+                        self.tx
+                            .enqueue(Packet(0, self.transport, self.stretch_factor))
+                            .ok();
                         self.paused = false;
                     }
                 });
@@ -289,7 +306,9 @@ impl eframe::App for MyApp {
                             self.paused = true;
                             self.last_paused = Instant::now();
                             //pause audio thread
-                            self.tx.enqueue(Packet(1, self.transport)).ok();
+                            self.tx
+                                .enqueue(Packet(1, self.transport, self.stretch_factor))
+                                .ok();
                         }
                     }
                 }
