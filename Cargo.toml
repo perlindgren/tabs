@@ -26,5 +26,6 @@ splines = { version = "4.3.1" }
 lib = { git = "https://github.com/slundi/guitarpro" }
 rodio = { version = "0.19.0", features = ["mp3", "wav", "flac"] }
 num = "0.4.3"
+symphonia = { version = "0.5.4", features = ["mp3"] }
 # fundsp = "0.19.1"
 # lib = {path = "../guitarpro/lib/"}

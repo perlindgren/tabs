@@ -22,15 +22,14 @@ fn main() {
     let path = Path::new(&path);
     let speed = args.speed;
     let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
-
     // Load a sound from a file, using a path relative to Cargo.toml
     let file = BufReader::new(File::open(path).unwrap());
     // Decode that sound file into a source
-    let source = Decoder::new(file).unwrap().speed(speed);
+    let source = Decoder::new(file).unwrap().speed(0.5);
 
     println!("Now playing: {}", args.path);
     // Play the sound directly on the device
     stream_handle.play_raw(source.convert_samples()).unwrap();
 
-    std::thread::sleep(std::time::Duration::from_secs(5));
+    std::thread::sleep(std::time::Duration::from_secs(20));
 }
