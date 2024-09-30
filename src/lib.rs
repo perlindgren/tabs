@@ -25,12 +25,18 @@ pub struct EADGBE {}
 
 impl EADGBE {
     const ROOT_NOTES: [Note; 6] = [
-        Note::new(SemiTone::E, 2),
-        Note::new(SemiTone::A, 2),
-        Note::new(SemiTone::D, 3),
-        Note::new(SemiTone::G, 3),
-        Note::new(SemiTone::B, 3),
         Note::new(SemiTone::E, 4),
+        Note::new(SemiTone::B, 3),
+        Note::new(SemiTone::G, 3),
+        Note::new(SemiTone::D, 3),
+        Note::new(SemiTone::A, 2),
+        Note::new(SemiTone::E, 2),
+        //    Note::new(SemiTone::E, 2),
+        //    Note::new(SemiTone::A, 2),
+        //    Note::new(SemiTone::D, 3),
+        //    Note::new(SemiTone::G, 3),
+        //    Note::new(SemiTone::B, 3),
+        //    Note::new(SemiTone::E, 4),
     ];
 }
 

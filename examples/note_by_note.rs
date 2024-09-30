@@ -1,20 +1,28 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
 
-use eframe::egui;
-
 use clap::Parser;
+use cpal::{traits::*, *};
+use eframe::egui;
 use heapless::spsc::*;
+use num::complex::ComplexFloat;
+use std::collections::HashSet;
+use std::ops::Mul;
 use std::{
     rc::Rc,
     time::{Duration, Instant},
 };
-
 struct Packet(u8, Duration);
 
 const QUEUE_SIZE: usize = 8;
 type Q = Queue<Packet, QUEUE_SIZE>;
 
 type P = Producer<'static, Packet, QUEUE_SIZE>;
+
+const AUDIO_QUEUE_SIZE: usize = 1024; // in f32
+type A_Q = Queue<f32, { AUDIO_QUEUE_SIZE * 2 }>;
+type A_C = Consumer<'static, f32, { AUDIO_QUEUE_SIZE * 2 }>;
+
+const FS: usize = 2048 * 2;
 
 use log::*;
 use scorelib::gp;
@@ -47,10 +55,52 @@ fn main() -> Result<(), eframe::Error> {
         // vsync: false,
         ..Default::default()
     };
+    let spsc: &'static mut A_Q = {
+        static mut SPSC: A_Q = Queue::new();
+        #[allow(static_mut_refs)]
+        unsafe {
+            &mut SPSC
+        }
+    };
+
+    let (mut producer, consumer) = spsc.split();
+    let host = cpal::default_host();
+
+    let device = host
+        .default_input_device()
+        .expect("no input device available");
+    let config = cpal::StreamConfig {
+        channels: 1,
+        sample_rate: SampleRate(FS as u32),
+        buffer_size: BufferSize::Fixed(64 * 4), // 64 samples
+    };
+    let input_stream = device
+        .build_input_stream(
+            &config,
+            move |data: &[f32], _info: &cpal::InputCallbackInfo| {
+                //println!("INPUT");
+                for &sample in data {
+                    if producer.enqueue(sample).is_err() {
+                        //println!("spsc queue full");
+                    }
+                }
+            },
+            move |err| {
+                // react to errors here.
+                println!("stream error {:?}", err)
+            },
+            None, // None=blocking, Some(Duration)=timeout
+        )
+        .expect("failed to configure input stream");
+    input_stream.play().unwrap();
+
     eframe::run_native(
         "Fret Test",
         options,
-        Box::new(|cc| Ok(Box::new(MyApp::new(cc)))),
+        Box::new(move |cc| {
+            let app = MyApp::new(cc, consumer);
+            Ok(Box::new(app))
+        }),
     )
 }
 
@@ -67,10 +117,14 @@ struct MyApp {
     note_by_note: bool,
     beat: f32,
     tx: P,
+    audio_consumer: A_C,
+    in_data: [f32; FS],
+    ptr: usize,
+    expected_notes: Vec<FretNote>,
 }
 
 impl MyApp {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(_cc: &eframe::CreationContext<'_>, consumer: A_C) -> Self {
         let args: Args = Args::parse();
         let mut song: gp::Song = gp::Song::default();
         let f = Path::new(&args.path);
@@ -108,7 +162,7 @@ impl MyApp {
         }
 
         let mut strings: Vec<Note> = strings.iter().map(|item| (*item).into()).collect();
-        strings.reverse();
+        //strings.reverse();
 
         let eadgbe = EADGBE {};
         let eadg = EADG {};
@@ -195,7 +249,6 @@ impl MyApp {
                 }
             }
         });
-
         Self {
             fret_board: FretChart::new(fret_notes),
             looping: false,
@@ -209,6 +262,10 @@ impl MyApp {
             note_by_note: false,
             beat: 0.0,
             tx,
+            audio_consumer: consumer,
+            in_data: [0.0; FS],
+            ptr: 0,
+            expected_notes: vec![],
         }
     }
 }
@@ -216,6 +273,11 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             let now = Instant::now();
+            //ring buffer
+            while let Some(s) = self.audio_consumer.dequeue() {
+                self.in_data[self.ptr] = s; // most recent sample
+                self.ptr = (self.ptr + 1) % FS; // next
+            }
             let since = now - self.time_instant;
             let one_sec = Duration::from_secs(1);
             let transport = now - (self.start_instant + self.paused_time);
@@ -255,12 +317,37 @@ impl eframe::App for MyApp {
                 // Note detection to be done here
                 // for this PoC, spacebar unpauses playback
                 // we should also maybe send the time to the playback thread so time is adjusted
-                ui.input(|i| {
-                    if i.key_pressed(egui::Key::Space) {
-                        self.tx.enqueue(Packet(0, transport)).ok();
-                        self.paused = false;
+                let harmonic: f32 = 4.0;
+                let p: u8 = 40;
+
+                let mut remove_indices = vec![];
+                for (i, expected) in self.expected_notes.iter().enumerate() {
+                    let note: Note = expected.into();
+                    let expected_fr: Hz = note.into();
+                    println!("expected_fr: {}", expected_fr.0);
+                    let expected_fr: f32 = expected_fr.0 * harmonic;
+                    let sin_cos_hann = tabs::dsp::sin_cos_hann(FS, expected_fr, p);
+                    let c = tabs::dsp::conv_at_k(&self.in_data, &sin_cos_hann, FS / 2);
+                    if c.abs() > 0.0009 {
+                        remove_indices.push(i);
+
+                        println!("CORRECT NOTE DETECTED: c: {}", c.abs());
                     }
-                });
+                }
+                remove_indices.reverse();
+                // reverse to preserve expected ordering when removing
+                for i in remove_indices {
+                    self.expected_notes.remove(i);
+                }
+
+                if self.expected_notes.is_empty() {
+                    self.tx.enqueue(Packet(0, transport)).ok();
+                    self.paused = false;
+                }
+                //println!("sin_cos_hann {}", sin_cos_hann.first().unwrap());
+                //unpause
+                // self.tx.enqueue(Packet(0, transport)).ok();
+                // self.paused = false;
                 self.paused_time += since;
             } else {
                 //4 beats per measure
@@ -277,6 +364,7 @@ impl eframe::App for MyApp {
                         //is there a note within the last frame?
                         if (start_range..end_range).contains(&(n.start)) {
                             self.paused = true;
+                            self.expected_notes.push(n.clone());
                             self.last_paused = Instant::now();
                             //pause audio thread
                             self.tx.enqueue(Packet(1, transport)).ok();
