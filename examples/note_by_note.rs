@@ -3,29 +3,31 @@
 use clap::Parser;
 use cpal::{traits::*, *};
 use eframe::egui;
+use egui::{Align2, Color32, FontId, Sense};
 use heapless::spsc::*;
-use num::complex::ComplexFloat;
-use std::collections::HashSet;
-use std::ops::Mul;
+use num::{complex::ComplexFloat, traits::WrappingSub};
 use std::{
+    ops::{Add, RangeBounds},
     rc::Rc,
     time::{Duration, Instant},
 };
 struct Packet(u8, Duration);
-
 const QUEUE_SIZE: usize = 8;
 type Q = Queue<Packet, QUEUE_SIZE>;
 
 type P = Producer<'static, Packet, QUEUE_SIZE>;
 
 const AUDIO_QUEUE_SIZE: usize = 1024; // in f32
-type A_Q = Queue<f32, { AUDIO_QUEUE_SIZE * 2 }>;
-type A_C = Consumer<'static, f32, { AUDIO_QUEUE_SIZE * 2 }>;
+type AQ = Queue<f32, { AUDIO_QUEUE_SIZE * 2 }>;
+type AC = Consumer<'static, f32, { AUDIO_QUEUE_SIZE * 2 }>;
 
 const FS: usize = 2048 * 2;
 
+//in millis
+const HIT_WINDOW: u128 = 300;
+
 use log::*;
-use scorelib::gp;
+use scorelib::{enums::NoteType, gp, note::NoteEffect};
 use std::{fs, io::Read, path::Path};
 use tabs::{fret_chart::*, *};
 
@@ -55,8 +57,8 @@ fn main() -> Result<(), eframe::Error> {
         // vsync: false,
         ..Default::default()
     };
-    let spsc: &'static mut A_Q = {
-        static mut SPSC: A_Q = Queue::new();
+    let spsc: &'static mut AQ = {
+        static mut SPSC: AQ = Queue::new();
         #[allow(static_mut_refs)]
         unsafe {
             &mut SPSC
@@ -117,14 +119,15 @@ struct MyApp {
     note_by_note: bool,
     beat: f32,
     tx: P,
-    audio_consumer: A_C,
+    audio_consumer: AC,
     in_data: [f32; FS],
     ptr: usize,
-    expected_notes: Vec<FretNote>,
+    expected_notes: Vec<(FretNote, usize)>,
+    finished: bool,
 }
 
 impl MyApp {
-    fn new(_cc: &eframe::CreationContext<'_>, consumer: A_C) -> Self {
+    fn new(_cc: &eframe::CreationContext<'_>, consumer: AC) -> Self {
         let args: Args = Args::parse();
         let mut song: gp::Song = gp::Song::default();
         let f = Path::new(&args.path);
@@ -161,8 +164,7 @@ impl MyApp {
             strings.push(MidiNote(s.1 as u32));
         }
 
-        let mut strings: Vec<Note> = strings.iter().map(|item| (*item).into()).collect();
-        //strings.reverse();
+        let strings: Vec<Note> = strings.iter().map(|item| (*item).into()).collect();
 
         let eadgbe = EADGBE {};
         let eadg = EADG {};
@@ -187,19 +189,22 @@ impl MyApp {
             let voice = measure.voices.first().unwrap();
             for beat in &voice.beats {
                 for note in &beat.notes {
-                    let fret_note = FretNote::new(
-                        (note.string - 1) as u8, //zero indexed...
-                        note.value as u8,
-                        current_time as f32,
-                        None,
-                        tuning.clone(),
-                    );
-                    fret_notes.push(fret_note);
-                    current_time += 1.0 / beat.duration.value as f64;
+                    println!("{}", note.duration_percent);
+                    if note.kind == NoteType::Normal && note.velocity > 0 {
+                        let fret_note = FretNote::new(
+                            (note.string - 1) as u8, //zero indexed...
+                            note.value as u8,
+                            current_time as f32,
+                            None,
+                            tuning.clone(),
+                        );
+                        fret_notes.push(fret_note);
+                        current_time += 1.0 / beat.duration.value as f64;
+                    }
                 }
             }
         }
-
+        loop {}
         let fret_notes = FretNotes(fret_notes);
 
         let path = &args.audio_path;
@@ -259,13 +264,14 @@ impl MyApp {
             paused: false,
             last_paused: Instant::now(),
             paused_time: Duration::from_secs(0),
-            note_by_note: false,
+            note_by_note: true,
             beat: 0.0,
             tx,
             audio_consumer: consumer,
             in_data: [0.0; FS],
             ptr: 0,
             expected_notes: vec![],
+            finished: false,
         }
     }
 }
@@ -313,66 +319,135 @@ impl eframe::App for MyApp {
                 }
             }
             self.time_instant = now;
-            if self.paused {
-                // Note detection to be done here
-                // for this PoC, spacebar unpauses playback
-                // we should also maybe send the time to the playback thread so time is adjusted
-                let harmonic: f32 = 4.0;
-                let p: u8 = 40;
+            if !self.finished {
+                if self.paused {
+                    let harmonic: f32 = 4.0;
+                    let p: u8 = 40;
 
-                let mut remove_indices = vec![];
-                for (i, expected) in self.expected_notes.iter().enumerate() {
-                    let note: Note = expected.into();
-                    let expected_fr: Hz = note.into();
-                    println!("expected_fr: {}", expected_fr.0);
-                    let expected_fr: f32 = expected_fr.0 * harmonic;
-                    let sin_cos_hann = tabs::dsp::sin_cos_hann(FS, expected_fr, p);
-                    let c = tabs::dsp::conv_at_k(&self.in_data, &sin_cos_hann, FS / 2);
-                    if c.abs() > 0.0009 {
-                        remove_indices.push(i);
+                    let mut remove_indices = vec![];
+                    for (i, expected) in self.expected_notes.iter().enumerate() {
+                        const THRESHOLD: f32 = 0.0009; // likeness factor between filter and signal
+                                                       // will probably be affected by signal volume and instrument tuning and
+                                                       // intonation so should be derived from the actual signal eventually.
+                        let note: Note = expected.0.clone().into();
+                        let expected_fr: Hz = note.into();
+                        println!("expected_fr: {}", expected_fr.0);
+                        let expected_fr: f32 = expected_fr.0 * harmonic;
+                        let sin_cos_hann = tabs::dsp::sin_cos_hann(FS, expected_fr, p);
+                        let c = tabs::dsp::conv_at_k(&self.in_data, &sin_cos_hann, FS / 2);
+                        if c.abs() > THRESHOLD {
+                            remove_indices.push(i);
 
-                        println!("CORRECT NOTE DETECTED: c: {}", c.abs());
-                    }
-                }
-                remove_indices.reverse();
-                // reverse to preserve expected ordering when removing
-                for i in remove_indices {
-                    self.expected_notes.remove(i);
-                }
-
-                if self.expected_notes.is_empty() {
-                    self.tx.enqueue(Packet(0, transport)).ok();
-                    self.paused = false;
-                }
-                //println!("sin_cos_hann {}", sin_cos_hann.first().unwrap());
-                //unpause
-                // self.tx.enqueue(Packet(0, transport)).ok();
-                // self.paused = false;
-                self.paused_time += since;
-            } else {
-                //4 beats per measure
-                self.beat = (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
-                // if note by note is active, check if needs pause
-                if self.note_by_note {
-                    let start_range = ((transport.as_micros() as f32 - since.as_micros() as f32)
-                        / 1000000.0)
-                        * (self.bpm / 4.0)
-                        / 60.0;
-                    let end_range =
-                        (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
-                    for n in &self.fret_board.notes.0 {
-                        //is there a note within the last frame?
-                        if (start_range..end_range).contains(&(n.start)) {
-                            self.paused = true;
-                            self.expected_notes.push(n.clone());
-                            self.last_paused = Instant::now();
-                            //pause audio thread
-                            self.tx.enqueue(Packet(1, transport)).ok();
+                            println!("CORRECT NOTE DETECTED: c: {}", c.abs());
                         }
                     }
+                    remove_indices.reverse();
+                    // reverse to preserve expected ordering when removing
+                    for i in remove_indices {
+                        let idx = self.expected_notes.get(i).unwrap().1;
+                        let note_ref = self.fret_board.notes.0.get_mut(idx).unwrap();
+                        note_ref.hit = true;
+                        self.expected_notes.remove(i);
+                    }
+                    // if we are not awaiting any more notes, unpause playback
+                    if self.expected_notes.is_empty() {
+                        self.tx.enqueue(Packet(0, transport)).ok();
+                        self.paused = false;
+                    }
+                    self.paused_time += since;
+                } else {
+                    //4 beats per measure
+                    self.beat =
+                        (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
+                    // if note by note is active, check if needs pause
+                    if self.note_by_note {
+                        let start_range =
+                            ((transport.as_micros() as f32 - since.as_micros() as f32) / 1000000.0)
+                                * (self.bpm / 4.0)
+                                / 60.0;
+                        let end_range =
+                            (transport.as_micros() as f32 / 1000000.0) * (self.bpm / 4.0) / 60.0;
+
+                        let mut i = 0;
+                        let mut finished = true;
+                        for n in self.fret_board.notes.0.iter() {
+                            //is there a note within the last frame?
+                            if n.start > end_range {
+                                finished = false;
+                            }
+                            if (start_range..end_range).contains(&(n.start)) {
+                                self.paused = true;
+                                self.expected_notes.push((n.clone(), i));
+                                self.last_paused = Instant::now();
+                                //pause audio thread
+                                self.tx.enqueue(Packet(1, transport)).ok();
+                            }
+
+                            i += 1;
+                        }
+                        if finished {
+                            self.finished = true
+                        };
+                    } else {
+                        let start_window = (transport.as_millis() as f32 / 1000.0
+                            - ((HIT_WINDOW as f32 / 2000.0) as f32))
+                            * (self.bpm / 4.0)
+                            / 60.0;
+                        let end_window = ((transport.as_millis() as f32 / 1000.0)
+                            + (HIT_WINDOW as f32 / 2000.0))
+                            * (self.bpm / 4.0)
+                            / 60.0;
+                        println!("{}:{}", start_window, end_window);
+                        let mut finished = true;
+                        for n in self.fret_board.notes.0.iter_mut() {
+                            if (start_window..end_window).contains(&n.start) && !n.hit {
+                                const THRESHOLD: f32 = 0.0009; // likeness factor between filter and signal
+                                                               // will probably be affected by signal volume and instrument tuning and
+                                                               // intonation so should be derived from the actual signal eventually.
+                                let harmonic = 4.0;
+                                let p = 40;
+                                let note: Note = n.into();
+                                let expected_fr: Hz = note.into();
+                                println!("expected_fr: {}", expected_fr.0);
+                                let expected_fr: f32 = expected_fr.0 * harmonic;
+                                let sin_cos_hann = tabs::dsp::sin_cos_hann(FS, expected_fr, p);
+                                let c = tabs::dsp::conv_at_k(&self.in_data, &sin_cos_hann, FS / 2);
+                                if c.abs() > THRESHOLD {
+                                    n.hit = true;
+                                    println!("CORRECT NOTE DETECTED: c: {}", c.abs());
+                                }
+                            }
+                            if n.start > start_window {
+                                finished = false;
+                            }
+                        }
+                        if finished {
+                            self.finished = true
+                        };
+                    }
                 }
+                self.fret_board.ui_content(ui, self.beat);
+            } else {
+                let size = ui.available_size();
+                let (response, painter) = ui.allocate_painter(size, Sense::hover());
+                let rect = response.rect;
+                let mut correct_notes = 0;
+                for n in &self.fret_board.notes.0 {
+                    if n.hit {
+                        correct_notes += 1;
+                    }
+                }
+
+                let accuracy =
+                    (correct_notes as f32 / self.fret_board.notes.0.len() as f32) * 100.0;
+                painter.text(
+                    (rect.width() / 2.0, rect.height() / 2.0).into(),
+                    Align2::CENTER_CENTER,
+                    format!("SONG FINISHED\nACCURACY: {}%\nYOU WIN?", accuracy),
+                    FontId::monospace(50.0),
+                    Color32::WHITE,
+                );
             }
-            self.fret_board.ui_content(ui, self.beat);
             ctx.request_repaint();
         });
     }

@@ -2,19 +2,15 @@
 
 use num::complex::ComplexFloat;
 use rodio::{Decoder, Source};
-use std::{f32::consts::PI, fs::File, path::Path};
+use std::{fs::File, path::Path};
 
 fn main() {
-    //let fs: usize = 48000;
-
     let e2_file = File::open(Path::new("./e2.wav")).unwrap();
     let f2_file = File::open(Path::new("./f2.wav")).unwrap();
 
     let source_e2 = Decoder::new(e2_file).unwrap();
     let source_f2 = Decoder::new(f2_file).unwrap();
     let fs = source_e2.sample_rate() as usize;
-    let x = 0..fs;
-
     let samples_e2: Vec<f32> = source_e2.convert_samples::<f32>().collect();
     let samples_f2: Vec<f32> = source_f2.convert_samples::<f32>().collect();
 
@@ -41,18 +37,6 @@ fn main() {
         "latency_time {}, latency_samples {}",
         latency_time, latency_samples
     );
-
-    //let f = f_expected;
-    /*let data: Vec<f32> = x
-            .clone()
-            .map(|k| (2.0 * PI * f * k as f32 / fs as f32).sin())
-            .collect();
-
-        let f2 = 87.31 * harmonic as f32;
-        let data2: Vec<f32> = x
-            .map(|k| (2.0 * PI * f2 * k as f32 / fs as f32).sin())
-            .collect();
-    */
     // hanning weighted sin_cos window
     let sin_cos_hann = tabs::dsp::sin_cos_hann(fs, f_expected, p);
 

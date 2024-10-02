@@ -46,6 +46,7 @@ impl FretChart {
         }
     }
     pub fn ui_content(&mut self, ui: &mut Ui, play_head: f32) -> egui::Response {
+        let play_head = play_head - 1.0;
         let size = ui.available_size();
         let (response, painter) = ui.allocate_painter(size, Sense::hover());
         let rect = response.rect;
@@ -63,6 +64,16 @@ impl FretChart {
                 fret_stroke,
             );
         }
+
+        // draw playhead,
+        let playhead_stroke = Stroke::new(1.0, Color32::RED);
+        painter.line_segment(
+            [
+                ((rect.width() / self.config.beats), rect.top()).into(),
+                ((rect.width() / self.config.beats), rect.bottom()).into(),
+            ],
+            playhead_stroke,
+        );
 
         // draw bars,
         let bar_stroke = Stroke::new(1.0, Color32::from_gray(255));
@@ -109,8 +120,12 @@ impl FretChart {
 
         for n in &self.notes.0 {
             let y = string_space * (0.5 + n.string as f32) + rect.top();
-            let c = (rect.left() + (n.start - play_head) * bar_pixels, y).into();
-
+            let c = ((rect.left() + (n.start - play_head) * bar_pixels), y).into();
+            let fill_color = if n.hit {
+                Color32::LIGHT_GREEN
+            } else {
+                Color32::LIGHT_RED
+            };
             if n.start > play_head + self.config.beats || n.start < play_head {
                 trace!("skipping {}", n.start);
             }
@@ -123,7 +138,7 @@ impl FretChart {
                 painter.rect(
                     [(left, top).into(), (right, bottom).into()].into(),
                     string_space * 0.1,
-                    Color32::LIGHT_RED,
+                    fill_color,
                     note_stroke,
                 );
                 painter.text(
@@ -134,7 +149,7 @@ impl FretChart {
                     Color32::WHITE,
                 );
             } else {
-                painter.circle(c, string_space / 4.0, Color32::LIGHT_RED, note_stroke);
+                painter.circle(c, string_space / 4.0, fill_color, note_stroke);
                 painter.text(
                     c,
                     Align2::CENTER_CENTER,

@@ -23,15 +23,15 @@ fn play(device: &cpal::Device, file: File, file2: File) {
     let sample_rate = source.sample_rate();
     let channels = source.channels();
     let samples = source.convert_samples::<f32>();
-    let mut samples_vec = vec![];
-    for sample in samples {
-        samples_vec.push(sample.into_sample());
-    }
+    // let mut samples_vec = vec![];
+    //for sample in samples {
+    //    samples_vec.push(sample.into_sample());
+    //}
 
     let (_stream, stream_handle) = OutputStream::try_default().unwrap();
 
     let sink = Sink::try_new(&stream_handle).unwrap();
 
-    sink.append(samples_vec.iter());
+    //    sink.append(samples_vec.iter());
     std::thread::sleep(Duration::from_secs(10));
 }

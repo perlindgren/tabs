@@ -1,6 +1,8 @@
 use std::{fmt::Debug, rc::Rc};
 mod note;
 pub use note::*;
+pub mod drums;
+pub mod drums_gui;
 pub mod dsp;
 pub mod fret_chart;
 pub mod spectrum;
@@ -73,6 +75,7 @@ pub struct FretNote {
     pub start: f32,       // start time in beats, 3.0 denotes a note struct at beat 3
     pub ext: Option<f32>, // off time
     pub tuning: Rc<dyn Tuning>,
+    pub hit: bool,
 }
 
 impl FretNote {
@@ -83,12 +86,19 @@ impl FretNote {
             start,
             ext,
             tuning,
+            hit: false,
         }
     }
 }
 
 impl From<&FretNote> for Note {
     fn from(note: &FretNote) -> Self {
+        note.tuning.tuning()[note.string as usize] + note.fret.into()
+    }
+}
+
+impl From<&mut FretNote> for Note {
+    fn from(note: &mut FretNote) -> Self {
         note.tuning.tuning()[note.string as usize] + note.fret.into()
     }
 }
