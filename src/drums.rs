@@ -1,8 +1,7 @@
 use scorelib::gp;
 use std::collections::HashMap;
 use std::{io::Read, path::Path};
-
-#[derive(Debug)]
+#[derive()]
 pub struct DrumMapping(pub HashMap<i16, Drum>);
 
 impl DrumMapping {
@@ -72,7 +71,7 @@ impl DrumNote {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Drum {
     Snare,
     HihatClosed,
