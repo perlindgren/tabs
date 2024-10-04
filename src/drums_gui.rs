@@ -1,9 +1,9 @@
 use crate::drums::*;
-use egui::{Align2, Color32, FontId, Response, Sense, Stroke, Ui};
+use egui::{Align2, Color32, FontId, Sense, Stroke, Ui};
 use heapless::spsc::*;
 use midir::{MidiInput, MidiInputConnection, MidiInputPort};
 
-type Packet = u8;
+type Packet = (u8, u8); // ID, Velocity
 const QUEUE_SIZE: usize = 8; //2 feet + 2 hands * 2 should be enough
 type Q = Queue<Packet, QUEUE_SIZE>;
 
@@ -36,8 +36,8 @@ impl DrumMappingGui {
         let text = format!("Hit {:?}", self.state);
         if let Some(msg) = self.consumer.dequeue() {
             self.hit_counter += 1;
-            if !self.mapping.0.contains_key(&(msg as i16)) {
-                self.mapping.0.insert(msg as i16, self.state);
+            if !self.mapping.0.contains_key(&(msg.0 as i16)) {
+                self.mapping.0.insert(msg.0 as i16, self.state);
             }
             if self.hit_counter == 10 {
                 self.state = match self.state {
@@ -158,23 +158,30 @@ impl DrumView {
 impl eframe::App for DrumView {
     fn update(&mut self, ctx: &egui::Context, _fram: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            // handle potential MIDI messages
+
             if let Some(rx) = &mut self.consumer {
                 if let Some(msg) = rx.dequeue() {
-                    if !self.drum_mapping_gui.is_opened {
-                        if let Some(drum) = self.drum_mapping_gui.mapping.0.get(&(msg as i16)) {
-                            for d in self.drums.iter_mut() {
-                                if &d.0 == drum {
-                                    d.1 = 10; // change color for 10 frames to indicate hit
-                                }
-                                if drum == &Drum::Kick {
-                                    self.kick = 10;
+                    // If note velocity is non-zero
+                    if msg.1 != 0 {
+                        if !self.drum_mapping_gui.is_opened {
+                            if let Some(drum) = self.drum_mapping_gui.mapping.0.get(&(msg.0 as i16))
+                            {
+                                // set the hit drum as hit, the value here is used as a frame
+                                // counter, decreasing by 1 each frame
+                                for d in self.drums.iter_mut() {
+                                    if &d.0 == drum {
+                                        d.1 = 10; // change color for 10 frames to indicate hit
+                                    }
+                                    if drum == &Drum::Kick {
+                                        self.kick = 10;
+                                    }
                                 }
                             }
+                        } else {
+                            // If Config Wizard is open, forward the MIDI message to it.
+                            self.producer.enqueue(msg).ok();
                         }
-                        //self.counter += 1;
-                        //println!("main GUI msg:{} {}", msg, self.counter);
-                    } else {
-                        self.producer.enqueue(msg).ok();
                     }
                 }
             }
@@ -189,11 +196,12 @@ impl eframe::App for DrumView {
                     "Select Input".to_string()
                 })
                 .show_ui(ui, |ui| {
+                    // Create a dropdown option for each detected port
                     for port in midi_input.ports() {
+                        // if this unwrap fails, we should probably panic in any case
                         let port_name = midi_input.port_name(&port).unwrap();
                         let dropdown_item =
                             ui.selectable_value(&mut self.device, Some(port), port_name);
-
                         if dropdown_item.clicked() {
                             // A MIDI Device has been selected, reconnect
                             if self.device.is_some() {
@@ -203,8 +211,10 @@ impl eframe::App for DrumView {
                     }
                 });
 
+            // Listen to the selected MIDI Device
             if let Some(device) = &self.device.as_ref() {
                 let name = midi_input.port_name(&device);
+                // If the device has changed, create a new SPSC
                 if self.midi_device_changed {
                     let spsc: &'static mut Q = {
                         static mut SPSC: Q = Queue::new();
@@ -217,24 +227,28 @@ impl eframe::App for DrumView {
                     let (mut tx, rx) = spsc.split();
 
                     self.consumer = Some(rx);
-
+                    // The producer is passed to the MIDI callback closure, enabling communication
+                    // with the GUI
                     self.midi_connection = Some(
                         midi_input
                             .connect(
                                 &device,
                                 &name.unwrap(),
                                 move |_, message, _| {
-                                    tx.enqueue(message[1]).ok();
+                                    // This is MIDI standard, 2nd byte of message is the MIDI code
+                                    // 3rd is the note velocity
+                                    tx.enqueue((message[1], message[2])).ok();
                                 },
                                 (),
                             )
                             .unwrap(),
                     );
+                    // We've now handled the device change
                     self.midi_device_changed = false;
                 }
             }
 
-            // wizard
+            // Spawn Config Wizard
             if ui.button("Configure Drums").clicked() {
                 self.drum_mapping_gui.is_opened = true;
             }
@@ -243,6 +257,28 @@ impl eframe::App for DrumView {
                 .open(&mut is_opened)
                 .collapsible(false)
                 .show(ctx, |ui| self.drum_mapping_gui.gui_wizard(ui));
+
+            if ui.button("Load Drum Mapping").clicked() {
+                let path_option = rfd::FileDialog::new().pick_file();
+                if let Some(path) = path_option {
+                    if let Ok(data) = std::fs::read_to_string(path) {
+                        let drum_mapping: Result<DrumMapping, serde_json::Error> =
+                            serde_json::from_str(&data);
+                        if let Ok(drum_mapping) = drum_mapping {
+                            self.drum_mapping_gui.mapping = drum_mapping;
+                        }
+                    }
+                }
+            }
+
+            if ui.button("Save Drum Mapping").clicked() {
+                let path_option = rfd::FileDialog::new().save_file();
+                if let Some(path) = path_option {
+                    let serialized_drum_mapping =
+                        serde_json::to_string(&self.drum_mapping_gui.mapping).unwrap();
+                    std::fs::write(path, serialized_drum_mapping).ok();
+                }
+            }
 
             // draw chart board
             let size = ui.available_size();
@@ -258,9 +294,12 @@ impl eframe::App for DrumView {
                     lane_stroke,
                 );
             }
+
             // drums
             let drum_stroke = Stroke::new(2.0, Color32::WHITE);
             for (i, drum) in self.drums.iter_mut().enumerate() {
+                // drum.1 is a frame counter as described in the MIDI SPSC handler
+                // we want to light up for a *couple* of frames when hit, for now it's 10.
                 let fill_color = if drum.1 > 0 {
                     drum.1 -= 1;
                     Color32::LIGHT_GREEN
@@ -277,7 +316,7 @@ impl eframe::App for DrumView {
                 );
             }
 
-            // kick
+            // kick bar
             let kick_stroke = Stroke::new(5.0, Color32::LIGHT_BLUE);
             if self.kick > 0 {
                 self.kick -= 1;
