@@ -6,25 +6,29 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.88"
 clap = { version = "4.5.17", features = ["derive"] }
-cpal = { version = "0.15.3", features = ["jack"] }
-eframe = "0.28.1"
-egui = { version = "0.28.1", features = ["serde"] }
-egui_extras = "0.28.1"
-egui_plot = "0.28.1"
+cpal = { version = "0.16.0", default-features = false }
+eframe = "0.33.2"
+egui = { version = "0.33.2", features = ["serde"] }
+egui_extras = "0.33.2"
+egui_plot = "0.34"
 env_logger = "0.11.5"
 
-heapless = { version = "0.8.0", features = ["portable-atomic"] }
+heapless = { version = "0.9.2", features = ["portable-atomic"] }
 
 
 # log = { version = "0.4.22", features = ["release_max_level_off"] }
-log = { version = "0.4.22" }
+log = { version = "0.4.28" }
 num_enum = "0.7.3"
-rand = "0.8.5"
+rand = "0.9.2"
 ringbuf = "0.4.4"
 spectrum-analyzer = "1.5.0"
-splines = { version = "4.3.1" }
+splines = { version = "5.0.0" }
 lib = { git = "https://github.com/slundi/guitarpro" }
-rodio = { version = "0.19.0", features = ["mp3", "wav", "flac"] }
+rodio = { version = "0.21.1", features = ["mp3", "wav", "flac"] }
 num = "0.4.3"
 # fundsp = "0.19.1"
 # lib = {path = "../guitarpro/lib/"}
+
+[features]
+default = ["jack"]
+jack = ["cpal/jack"]

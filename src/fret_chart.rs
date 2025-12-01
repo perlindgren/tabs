@@ -125,6 +125,7 @@ impl FretChart {
                     string_space * 0.1,
                     Color32::LIGHT_RED,
                     note_stroke,
+                    StrokeKind::Middle,
                 );
                 painter.text(
                     c,
