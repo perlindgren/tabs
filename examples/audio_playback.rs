@@ -14,7 +14,7 @@ struct Args {
         short = 'p',
         long,
         help = "Input file path",
-        default_value = "landskap_a_nameless_fool.mp3"
+        default_value = "assets/landskap_a_nameless_fool.mp3"
     )]
     path: String,
     #[clap(short = 's', long, help = "Speed", default_value_t = 1.0f32)]
@@ -36,7 +36,7 @@ fn main() {
     let source = Decoder::new(file).unwrap().speed(speed);
 
     println!("Now playing: {}", args.path);
-    let sink = Sink::connect_new(&stream_handle.mixer());
+    let sink = Sink::connect_new(stream_handle.mixer());
     sink.append(source);
 
     std::thread::sleep(std::time::Duration::from_secs(5));

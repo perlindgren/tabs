@@ -7,6 +7,7 @@ use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
 
 use log::*;
+use std::sync::Mutex;
 use tabs::spectrum::SpectrumView;
 
 const QUEUE_SIZE: usize = 2048; // in f32
@@ -14,6 +15,20 @@ type Q = Queue<f32, { QUEUE_SIZE * 2 }>;
 type C = Consumer<'static, f32>;
 
 const FS: usize = 48_000; // assume 48kHz sample rate
+
+struct SampleBuffer {
+    ptr: usize,
+    data: [f32; FS],
+}
+
+impl Default for SampleBuffer {
+    fn default() -> Self {
+        Self {
+            ptr: 0,
+            data: [0.0; FS],
+        }
+    }
+}
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -66,81 +81,49 @@ fn main() -> Result<(), eframe::Error> {
 
     input_stream.play().unwrap();
 
-    std::thread::spawn(move || {
-        let mut in_data: [f32; FS] = [0.0; FS];
-        let mut ptr: usize = 0;
+    let mtx_sample_buffer = Mutex::new(SampleBuffer::default());
 
+    let sb = std::thread::spawn(|| {
         loop {
+            // lock mutex
+            let sb = &mut mtx_sample_buffer.lock().unwrap();
+
+            let mut ptr = sb.ptr;
+
             while let Some(s) = consumer.dequeue() {
-                in_data[ptr] = s; // most resent sample
+                sb.data[ptr] = s; // most recent sample
                 ptr = (ptr + 1) % FS; // next
             }
             println!("ptr {}, now {:?}", ptr, std::time::SystemTime::now());
-
-            // create
-            let mut fft_in_data = [0.0; FS];
-
-            fft_in_data[FS - ptr..].copy_from_slice(&in_data[..ptr]);
-            fft_in_data[..FS - ptr].copy_from_slice(&in_data[ptr..]);
-
-            // most recent sample
-            assert_eq!(in_data[(FS + ptr - 1) % FS], *fft_in_data.last().unwrap());
-            // oldest sample
-            assert_eq!(in_data[ptr], *fft_in_data.first().unwrap());
+            sb.ptr = ptr;
+            drop(sb); // unlock mutex
 
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
     });
 
+    let app = MyApp::new(&mtx_sample_buffer);
+
     eframe::run_native(
         "Audio in test",
         options,
-        Box::new(move |cc| {
-            let app = Simple::new(cc);
-            Ok(Box::new(app))
-        }),
+        Box::new(move |cc| Ok(Box::new(app))),
     )
-
-    // eframe::run_native(
-    //     "Audio in test",
-    //     options,
-    //     Box::new(move |cc| {
-    //         let app = MyApp::new(cc, consumer);
-    //         Ok(Box::new(app))
-    //     }),
-    // )
 }
 
-struct Simple {}
+struct MyApp<'a> {
+    fft: SpectrumView,
+    mtx_sample_buffer: &'a Mutex<SampleBuffer>,
+}
 
-impl Simple {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        Self {}
+impl<'a> MyApp<'a> {
+    fn new(mtx_sample_buffer: &'a Mutex<SampleBuffer>) -> Self {
+        Self {
+            mtx_sample_buffer,
+            fft: SpectrumView::default(),
+        }
     }
 }
-
-impl eframe::App for Simple {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {});
-    }
-}
-// struct MyApp {
-//     consumer: C,
-//     in_data: [f32; FS],
-//     ptr: usize, // pointer in data
-//     fft: SpectrumView,
-// }
-
-// impl MyApp {
-//     fn new(_cc: &eframe::CreationContext<'_>, consumer: C) -> Self {
-//         Self {
-//             consumer,
-//             in_data: [0.0; FS],
-//             ptr: 0,
-//             fft: SpectrumView::default(),
-//         }
-//     }
-// }
 
 // in_data     [0,1, .., ptr, ..., FS-1]
 //                 newest | oldest ...
@@ -148,52 +131,48 @@ impl eframe::App for Simple {
 
 const WINDOW: usize = FS;
 
-// impl eframe::App for MyApp {
-//     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-//         egui::CentralPanel::default().show(ctx, |ui| {
-//             while let Some(s) = self.consumer.dequeue() {
-//                 self.in_data[self.ptr] = s; // most resent sample
-//                 self.ptr = (self.ptr + 1) % FS; // next
-//             }
+impl<'a> eframe::App for MyApp<'a> {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let sb = self.mtx_sample_buffer.lock().unwrap();
+            ui.label(format!("ptr {}", sb.ptr));
 
-//             ui.label(format!("ptr {}", self.ptr));
+            //             // create
+            //             let mut fft_in_data = [0.0; FS];
 
-//             // create
-//             let mut fft_in_data = [0.0; FS];
+            //             fft_in_data[FS - self.ptr..].copy_from_slice(&self.in_data[..self.ptr]);
+            //             fft_in_data[..FS - self.ptr].copy_from_slice(&self.in_data[self.ptr..]);
 
-//             fft_in_data[FS - self.ptr..].copy_from_slice(&self.in_data[..self.ptr]);
-//             fft_in_data[..FS - self.ptr].copy_from_slice(&self.in_data[self.ptr..]);
+            //             // most recent sample
+            //             assert_eq!(
+            //                 self.in_data[(FS + self.ptr - 1) % FS],
+            //                 *fft_in_data.last().unwrap()
+            //             );
+            //             // oldest sample
+            //             assert_eq!(self.in_data[self.ptr], *fft_in_data.first().unwrap());
 
-//             // most recent sample
-//             assert_eq!(
-//                 self.in_data[(FS + self.ptr - 1) % FS],
-//                 *fft_in_data.last().unwrap()
-//             );
-//             // oldest sample
-//             assert_eq!(self.in_data[self.ptr], *fft_in_data.first().unwrap());
+            //             let mut spectrums = vec![];
 
-//             let mut spectrums = vec![];
+            //             for i in 0..4 {
+            //                 // spectrum analysis only of the latest WINDOW
+            //                 let relevant_samples = &fft_in_data[fft_in_data.len() - WINDOW / 2usize.pow(i)..];
 
-//             for i in 0..4 {
-//                 // spectrum analysis only of the latest WINDOW
-//                 let relevant_samples = &fft_in_data[fft_in_data.len() - WINDOW / 2usize.pow(i)..];
+            //                 // do FFT
+            //                 let hann_window = hann_window(relevant_samples);
+            //                 let spectrum = samples_fft_to_spectrum(
+            //                     &hann_window,
+            //                     FS as u32,
+            //                     FrequencyLimit::All, //
+            //                     // FrequencyLimit::Max(2000.0),
+            //                     Some(&divide_by_N),
+            //                 )
+            //                 .unwrap();
+            //                 spectrums.push(spectrum)
+            //             }
 
-//                 // do FFT
-//                 let hann_window = hann_window(relevant_samples);
-//                 let spectrum = samples_fft_to_spectrum(
-//                     &hann_window,
-//                     FS as u32,
-//                     FrequencyLimit::All, //
-//                     // FrequencyLimit::Max(2000.0),
-//                     Some(&divide_by_N),
-//                 )
-//                 .unwrap();
-//                 spectrums.push(spectrum)
-//             }
+            //             self.fft.ui_content(ui, spectrums);
 
-//             self.fft.ui_content(ui, spectrums);
-
-//             ctx.request_repaint();
-//         });
-//     }
-// }
+            //             ctx.request_repaint();
+        });
+    }
+}
